@@ -7,7 +7,8 @@ Created on Mon Jan 21 16:37:55 2019
 
 import tensorflow as tf
 import numpy as np
-
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = '0' #use GPU with ID=0
 
 def gelu(x):
   """Gaussian Error Linear Unit.
@@ -45,8 +46,10 @@ class FFN:
         return tf.nn.dropout(output, 1.0 - self.dropout)
 
     def dense_gelu_dense(self, inputs):
-        output = tf.layers.dense(inputs, self.w1_dim, activation=gelu)
-        output =tf.layers.dense(output, self.w2_dim)
+        with tf.variable_scope("dense_gelu_dense",reuse=tf.AUTO_REUSE) as scope:
+            output = tf.layers.dense(inputs, self.w1_dim, activation=gelu)
+        with tf.variable_scope("dense_gelu_dense_2",reuse=tf.AUTO_REUSE) as scope:
+            output =tf.layers.dense(output, self.w2_dim)
 
         return tf.nn.dropout(output, 1.0 - self.dropout)
 

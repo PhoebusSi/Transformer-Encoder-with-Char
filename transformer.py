@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 Created on Mon Jan 21 16:33:17 2019
-
 @author: jbk48
 """
 
@@ -9,8 +8,8 @@ import tensorflow as tf
 
 from attention import Attention
 from layer import FFN
-
-
+from keras.layers.core import Lambda ,Dense
+from keras import backend as K
 class Encoder:
 
     def __init__(self,
@@ -22,6 +21,7 @@ class Encoder:
                  ffn_dim=64,
                  dropout=0.2,
                  n_class=4,
+                 pre_n_class=5,
                  batch_size=128):
 
         self.num_layers = num_layers
@@ -32,11 +32,14 @@ class Encoder:
         self.ffn_dim = ffn_dim
         self.dropout = dropout
         self.n_class = n_class
+        self.pre_n_class = pre_n_class
         self.batch_size = batch_size
-
-    def build(self, encoder_inputs, seq_len):
+        print("\ntransformer_outputs_Class_Number",self.pre_n_class,self.n_class)
+    def build(self, encoder_inputs, seq_len ,model_type):
+        def Tensor2Layer( tensor):
+             return tensor
         o1 = tf.identity(encoder_inputs)
-
+       
         for i in range(1, self.num_layers+1):
             with tf.variable_scope("layer-{}".format(i)):
                 o2 = self._add_and_norm(o1, self._self_attention(q=o1,
@@ -45,11 +48,30 @@ class Encoder:
                                                                  seq_len=seq_len), num=1)
                 o3 = self._add_and_norm(o2, self._positional_feed_forward(o2), num=2)
                 o1 = tf.identity(o3)
-          
+        def dense_layer(num,layer):
+            #return lambda:Dense(num)(layer)
+            return Dense(num)(layer)
+         
         with tf.variable_scope("GlobalAveragePooling-layer"):
             o3 = self._pooling_layer(q=o1, k=o1, v=o1, seq_len =seq_len)
-            
-        return o3
+            #o3 = Lambda(Tensor2Layer)(o3)
+            #logits=tf.cond(tf.equal(tf.constant(1.0),model_type),lambda: Dense(self.pre_n_class)(o3),lambda: Dense(self.n_class)(o3))#self.n_class)#.item()
+            #logits=tf.cond(tf.equal(tf.constant(1.0),model_type),lambda: dense_layer(self.pre_n_class,o3),lambda: dense_layer(self.n_class,o3))#self.n_class)#.item()
+            a = dense_layer(self.pre_n_class,o3)
+            b = dense_layer(self.n_class,o3)
+            print('aa',a,'bb',b)
+            #logits=K.switch(tf.equal(tf.constant(1.0),model_type), a,b)#dense_layer(self.pre_n_class,o3), dense_layer(self.n_class,o3))
+            logits = tf.cond(tf.equal(tf.constant(1.0),model_type),lambda:a,lambda:b)
+            #logits=tf.cond(tf.equal(tf.constant(1),model_type),lambda: Dense(inputs=o3, units=self.pre_n_class, activation=None),lambda: Dense(inputs=o3, units=self.n_class, activation=None))#self.n_class)#.item()
+            """
+            if tf.equal(tf.constant(1),model_type):
+                units_number=self.pre_n_class
+            else:
+                units_number=self.n_class
+            """
+            print('\n\nunits_number:',logits)
+            #logits= tf.layers.dense(inputs=o3, units=units_number.item(), activation=None) 
+        return logits
 
 
     def _pooling_layer(self, q, k, v, seq_len):

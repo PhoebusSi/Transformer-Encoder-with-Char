@@ -27,20 +27,48 @@ class Preprocess():
         self.stop.update(['.', ',', '"', "'", '?', '!', ':', ';', '(', ')', '[', ']', '{', '}', ""])
 
 
-    def load_data(self, train_filename, test_filename, max_len):
+    def load_data(self, train_filename, test_filename, max_len, pre_train1_filename='', pre_train2_filename='', pre_train3_filename=''):
         print("Making corpus!\nCould take few minutes!") 
         corpus, labels = self.read_data(train_filename)
         self.train_X, self.train_seq_length, self.train_Y = self.clean_text(corpus, labels)
         corpus, labels = self.read_data(test_filename)
         self.test_X, self.test_seq_length, self.test_Y = self.clean_text(corpus, labels)
         print("Tokenize done!")
-        return self.train_X, self.train_seq_length, self.train_Y, self.test_X, self.test_seq_length, self.test_Y
+        if len(pre_train1_filename):
+                corpus, labels = self.read_data(pre_train1_filename)
+                self.pre_train1_X, self.pre_train1_seq_length, self.pre_train1_Y = self.clean_text(corpus, labels)
+        else:
+                self.pre_train1_X=[]
+                self.pre_train1_seq_length=[]
+                self.pre_train1_Y=[]
+
+        if len(pre_train2_filename):
+                corpus, labels = self.read_data(pre_train2_filename)
+                self.pre_train2_X, self.pre_train2_seq_length, self.pre_train2_Y = self.clean_text(corpus, labels)
+        else:
+                self.pre_train2_X=[]
+                self.pre_train2_seq_length=[]
+                self.pre_train2_Y=[]
+        
+        if len(pre_train3_filename):
+                corpus, labels = self.read_data(pre_train3_filename)
+                self.pre_train3_X, self.pre_train3_seq_length, self.pre_train3_Y = self.clean_text(corpus, labels)
+        else:
+                self.pre_train3_X=[]
+                self.pre_train3_seq_length=[]
+                self.pre_train3_Y=[]
+        return self.train_X, self.train_seq_length, self.train_Y, self.test_X, self.test_seq_length, self.test_Y , self.pre_train1_X, self.pre_train1_seq_length, self.pre_train1_Y, self.pre_train2_X, self.pre_train2_seq_length, self.pre_train2_Y, self.pre_train3_X, self.pre_train3_seq_length, self.pre_train3_Y
     
     def read_data(self, filename):
         
         data = pd.read_csv(filename)      
         labels = data.iloc[:,0]
-        corpus = data.iloc[:,2]    
+        print("\n\ndata.iloc[0]:",data.iloc[0])
+        if len(data.iloc[0])==2:
+                corpus = data.iloc[:,1]
+        else:
+                corpus = data.iloc[:,1] + data.iloc[:,2] 
+        print ("xxx",len(data.iloc[0]),corpus[0])   
         encoder = LabelBinarizer()
         encoder.fit(labels)
         labels = encoder.transform(labels)

@@ -8,6 +8,7 @@ Created on Sun Jan 20 18:53:17 2019
 
 import numpy as np
 import tensorflow as tf
+
 from keras.layers.pooling import GlobalAveragePooling2D, GlobalMaxPooling2D
 
 
@@ -49,11 +50,13 @@ class Attention:
         self.batch_size = batch_size
 
     def multi_head(self, q, k, v, seq_len):
-        q, k, v = self._linear_projection(q, k, v)
-        qs, ks, vs = self._split_heads(q, k, v)
-        outputs = self._scaled_dot_product(qs, ks, vs, seq_len)
-        output = self._concat_heads(outputs)
-        output = tf.layers.dense(output, self.model_dim)
+        with tf.variable_scope("multi-head",reuse=False) as scope:
+            q, k, v = self._linear_projection(q, k, v)
+            qs, ks, vs = self._split_heads(q, k, v)
+            outputs = self._scaled_dot_product(qs, ks, vs, seq_len)
+            output = self._concat_heads(outputs)
+            print("\noutput&&moddel_dim",output,self.model_dim)
+            output = tf.layers.dense(output, self.model_dim)
 
         return tf.nn.dropout(output, 1.0 - self.dropout)
 
@@ -62,12 +65,14 @@ class Attention:
         qs, ks, vs = self._split_heads(q, k, v)
         outputs = self._scaled_dot_product(qs, ks, vs, seq_len)
         output = self._GlobalAverage_heads(outputs)
-        
+        #get the average outputs of each head(4 heads) 
         return output
 
     def _GlobalAverage_heads(self, outputs):
         outputs = tf.transpose(outputs, [0, 3, 2, 1]) # [batch_size, dim, max_seq_len, num_heads]
+        print('outputs1',outputs)
         outputs = GlobalAveragePooling2D()(outputs)
+        print('outputs2',outputs)
         return outputs
 
     def _GlobalMax_heads(self, outputs):
@@ -76,10 +81,14 @@ class Attention:
         return outputs
 
     def _linear_projection(self, q, k, v):
-        q = tf.layers.dense(q, self.linear_key_dim, use_bias=False)
-        k = tf.layers.dense(k, self.linear_key_dim, use_bias=False)
-        v = tf.layers.dense(v, self.linear_value_dim, use_bias=False)
-        return q, k, v
+        with tf.variable_scope("q_linear_projection",reuse=tf.AUTO_REUSE) as scope:
+            #tf.get_variable_scope().reuse_variables()
+            q = tf.layers.dense(q, self.linear_key_dim, use_bias=False)
+        with tf.variable_scope("k_linear_projection",reuse=tf.AUTO_REUSE) as scope:
+            k = tf.layers.dense(k, self.linear_key_dim, use_bias=False)
+        with tf.variable_scope("v_linear_projection",reuse=tf.AUTO_REUSE) as scope:
+            v = tf.layers.dense(v, self.linear_value_dim, use_bias=False)
+            return q, k, v
 
     def _split_heads(self, q, k, v):
 
@@ -113,6 +122,7 @@ class Attention:
             o2 = tf.where(tf.equal(masks, 0), paddings, o2)
             
         o3 = tf.nn.softmax(o2)
+        print("\no3_SHAPE",o3)
         return tf.matmul(o3, vs)
 
     def _concat_heads(self, outputs):
