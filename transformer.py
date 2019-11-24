@@ -35,11 +35,12 @@ class Encoder:
         self.pre_n_class = pre_n_class
         self.batch_size = batch_size
         print("\ntransformer_outputs_Class_Number",self.pre_n_class,self.n_class)
-    def to_get_loss(self,all_words_logits,logits,labels,word_embedding,model_type):
+    def to_get_loss(self,all_words_logits,logits,labels,word_embedding,mlm_mask_positions,mlm_mask_words,mlm_mask_weights,model_type):
             loss_1 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = logits , labels = labels)) # Softmax loss
-            loss_mlm =   get_masked_lm_output(bert_config, all_words_logits, word_embedding, positions,label_ids, label_weights):
+            loss_mlm =   get_masked_lm_output(bert_config, all_words_logits, word_embedding, mlm_mask_positions,mlm_mask_words, mlm_mask_weights):
+
             return loss
-    def build(self, encoder_inputs, seq_len ,labels,word_embedding,model_type):
+    def build(self, encoder_inputs, seq_len ,labels,word_embedding, mlm_mask_positions, mlm_mask_words,mlm_mask_weights,model_type):
         def Tensor2Layer( tensor):
              return tensor
         o1 = tf.identity(encoder_inputs)
@@ -83,7 +84,7 @@ class Encoder:
             """
             print('\n\nunits_number:',logits)
             #logits= tf.layers.dense(inputs=o3, units=units_number.item(), activation=None) 
-            loss = self.to_get_loss(all_words_logits,logits,labels,word_embedding,model_type)
+            loss = self.to_get_loss(all_words_logits,logits,labels,word_embedding,mlm_mask_positions,mlm_mask_words,mlm_mask_weights,model_type)
             #loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = logits , labels = labels)) # Softmax loss
         return loss,logits
         #loss is loss; logits is predictions ; o3 is the outputs of transformer(logits)

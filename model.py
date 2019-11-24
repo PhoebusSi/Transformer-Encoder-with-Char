@@ -56,12 +56,16 @@ class Model:
         self.char_len = tf.placeholder(tf.float32, [None, max_sent_len])
         self.dropout = tf.placeholder(tf.float32, shape = ())
         self.model_type = tf.placeholder(tf.float32, shape = ()) 
+        self.mlm_mask_positions = tf.placeholder(tf.float32,shape = [None, self.max_mask_words_per_sent],name = 'mask_pos') 
+        self.mlm_mask_words = tf.placeholder(tf.float32,shape = [None, self.max_mask_words_per_sent],name = 'mask_pos') 
+        self.mlm_mask_weights = tf.placeholder(tf.float32,shape = [None, self.max_mask_words_per_sent],name = 'mask_pos') 
+        
         self.word_input = tf.cast(self.word_input,tf.int32)
         self.char_input = tf.cast(self.char_input,tf.int32)
         self.label = tf.cast(self.label,tf.int32)
         self.seq_len = tf.cast(self.seq_len,tf.int32)
         self.char_len = tf.cast(self.char_len,tf.int32)
-
+        
     """
     def pre_train(self, batch_size, training_epochs, char_mode):
         train_X =self.pre_train1_X
@@ -428,7 +432,7 @@ class Model:
     def build_pre_train1_parameter(self,num_layers, num_heads, linear_key_dim, linear_value_dim, model_dim, ffn_dim, n_class):
         
         self.pre_train1_num_layers=num_layers
-        self.pre_train1_num_heads=num_heads
+        self.pre_train1_num_heads=num_heads:1
         self.pre_train1_linear_key_dim=linear_key_dim
         self.pre_train1_linear_value_dim=linear_value_dim
         self.pre_train1_model_dim=model_dim
@@ -447,7 +451,7 @@ class Model:
         self.pre_train1_n_class=pre_train1_n_class
         self.bool_pre_train1 = bool_pre_train_1
         self.count = 1 # if model_dim has divided by 2 in pretrain1 ,then it keep itsalf in trainiing process
-    def build_model(self, word_inputs, char_inputs, labels, seq_len, char_len, num_pre_train1_steps, num_train_steps, char_mode, model_type):
+    def build_model(self, word_inputs, char_inputs, labels, seq_len, char_len, num_pre_train1_steps, num_train_steps,mlm_mask_positions,mlm_mask_words, mlm_mask_weights,char_mode, model_type):
         print("Building model!")
         print("\nchar mode here is ",char_mode)
         gate = tf.constant(0)
@@ -497,7 +501,7 @@ class Model:
                               batch_size=self.batch_size)
         encoder_emb = self.build_embed(word_inputs, char_inputs, char_len, char_mode)
         with tf.variable_scope("encoder_build",reuse=tf.AUTO_REUSE) as scope:
-            loss,encoder_outputs = encoder.build(encoder_emb, seq_len ,labels,self.word_embedding ,model_type)
+            loss,encoder_outputs = encoder.build(encoder_emb, seq_len ,labels,self.word_embedding , mlm_mask_positions,mlm_mask_words,mlm_mask_weights,model_type)
             print("predict_outputs",encoder_outputs) 
             print("labels",labels)
             #loss = encoder_outputs
