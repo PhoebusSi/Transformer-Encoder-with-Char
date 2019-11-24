@@ -19,7 +19,7 @@ config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 class Model:
 
-    def __init__(self, word_dim, char_dim, max_sent_len, max_char_len, pre_train_learning_rate,train_learning_rate,num_pre_train1_steps, num_train_steps):
+    def __init__(self, word_dim, char_dim, max_sent_len, max_char_len, pre_train_learning_rate,train_learning_rate,num_pre_train1_steps, num_train_steps,max_mask_words_per_sent):
         
         self.word_dim = word_dim
         self.char_dim = char_dim
@@ -29,13 +29,17 @@ class Model:
         self.train_learning_rate = train_learning_rate
         self.num_train_steps = num_train_steps
         self.num_pre_train1_steps = num_pre_train1_steps
+        self.max_mask_words_per_sent = max_mask_words_per_sent 
 
         ## Preprocess data
         self.prepro = preprocess.Preprocess(self.char_dim, self.max_sent_len, self.max_char_len)
-        self.train_X, self.train_seq_length, self.train_Y, self.test_X, self.test_seq_length, self.test_Y ,self.pre_train1_X, self.pre_train1_seq_length, self.pre_train1_Y,self.pre_train2_X, self.pre_train2_seq_length, self.pre_train2_Y,self.pre_train3_X, self.pre_train3_seq_length, self.pre_train3_Y = self.prepro.load_data("./low_resource_AG_DATA/train100.csv", "./low_resource_AG_DATA/test.csv", self.max_sent_len,pre_train1_filename="./low_resource_AG_DATA/TC_data_5topic.csv")
+        self.train_X, self.train_seq_length, self.train_Y, self.test_X, self.test_seq_length, self.test_Y ,self.pre_train1_X, self.pre_train1_seq_length, self.pre_train1_Y,self.pre_train2_X, self.pre_train2_seq_length, self.pre_train2_Y,self.pre_train3_X, self.pre_train3_seq_length, self.pre_train3_Y = self.prepro.load_data("./low_resource_AG_DATA/train100.csv", "./low_resource_AG_DATA/test.csv", self.max_sent_len,pre_train1_filename="./low_resource_AG_DATA/train100.csv")#TC_data_5topic.csv")
+        self.mlm_X ,self.mlm_Y, self.mlm_seq_length = self.prepro.load_mlm_data("./low_resource_AG_DATA/maskedLM/MLM_data_mask_5topic.csv","./low_resource_AG_DATA/maskedLM/MLM_data_raw_5topic.csv",self.max_sent_len)
         self.word_embedding, self.char_embedding = self.prepro.prepare_embedding(self.char_dim)
         self.train_X, self.train_X_char, self.train_X_char_len, self.train_Y = self.prepro.prepare_data(self.train_X, self.train_Y, "train")
         self.test_X, self.test_X_char, self.test_X_char_len, self.test_Y = self.prepro.prepare_data(self.test_X, self.test_Y, "test")
+        self.mlm_X, self.mlm_X_char, self.mlm_X_char_len, self.mlm_positions,self.mlm_mask_weights = self.prepro.prepare_mlm_data_X(self.mlm_X, self.max_mask_words_per_sent, "mlm_pretrain_mask_X")
+        self.mlm_Y, self.mlm_Y_char, self.mlm_Y_char_len, self.mlm_mask_words = self.prepro.prepare_mlm_Y(self.mlm_Y, self.max_mask_words_per_sent,self.mlm_positions,"mlm_pretrain_Y")
         #print("xxx?",self.pre_train1_seq_length)
         if len(self.pre_train1_seq_length):
                 self.pre_train1_X, self.pre_train1_X_char, self.pre_train1_X_char_len, self.pre_train1_Y = self.prepro.prepare_data(self.pre_train1_X, self.pre_train1_Y, "pre_train1")
@@ -219,108 +223,6 @@ class Model:
         
         modelpath = "./tmp_model_transformer_ag_news_{}/".format(char_mode)
         modelName = "tmp_model_transformer_ag_news_{}.ckpt".format(char_mode)
-        """
-        include=["encoder_build/encoder/layer-5/add-and-norm-2/LayerNorm/beta",
-            "encoder_build/encoder/layer-7/self-attention/multi-head-output/dense/kernel",
-            "encoder_build/encoder/layer-6/feed-forward/dense_gelu_dense/dense/kernel",
-            "encoder_build/encoder/layer-3/self-attention/k_linear_projection/dense/kernel",
-            "encoder_build/encoder/layer-2/feed-forward/dense_gelu_dense_2/dense/kernel",
-            "encoder_build/encoder/layer-7/feed-forward/dense_gelu_dense_2/dense/kernel",
-            "encoder_build/encoder/layer-7/feed-forward/dense_gelu_dense/dense/bias",
-            "encoder_build/encoder/layer-3/feed-forward/dense_gelu_dense_2/dense/kernel",
-            "encoder_build/beta1_power",
-            "encoder_build/encoder/layer-3/feed-forward/dense_gelu_dense_2/dense/bias",
-            "encoder_build/encoder/layer-2/add-and-norm-1/LayerNorm/gamma",
-            "encoder_build/encoder/layer-6/add-and-norm-2/LayerNorm/beta",
-            "encoder_build/encoder/layer-2/feed-forward/dense_gelu_dense/dense/bias",
-            "encoder_build/encoder/layer-5/self-attention/multi-head-output/dense/kernel",
-            "encoder_build/encoder/layer-4/add-and-norm-1/LayerNorm/gamma",
-            "encoder_build/encoder/layer-2/add-and-norm-2/LayerNorm/gamma",
-            "encoder_build/encoder/layer-5/self-attention/multi-head-output/dense/bias",
-            "encoder_build/encoder/layer-5/self-attention/k_linear_projection/dense/kernel",
-            "encoder_build/encoder/layer-5/feed-forward/dense_gelu_dense_2/dense/bias",
-            "encoder_build/encoder/layer-5/feed-forward/dense_gelu_dense/dense/bias",
-            "encoder_build/encoder/layer-1/feed-forward/dense_gelu_dense/dense/kernel",
-            "encoder_build/encoder/layer-7/add-and-norm-2/LayerNorm/gamma",
-            "encoder_build/encoder/layer-1/add-and-norm-1/LayerNorm/gamma",
-            "encoder_build/encoder/layer-4/add-and-norm-2/LayerNorm/gamma",
-            "encoder_build/encoder/layer-6/self-attention/v_linear_projection/dense/kernel",
-            "encoder_build/encoder/layer-4/feed-forward/dense_gelu_dense/dense/kernel",
-            "encoder_build/encoder/layer-1/feed-forward/dense_gelu_dense_2/dense/bias",
-            "encoder_build/encoder/layer-5/add-and-norm-2/LayerNorm/gamma",
-            "encoder_build/encoder/layer-2/self-attention/v_linear_projection/dense/kernel",
-            "encoder_build/encoder/layer-6/self-attention/multi-head-output/dense/bias",
-            "encoder_build/encoder/layer-1/self-attention/k_linear_projection/dense/kernel",
-            "encoder_build/encoder/layer-6/add-and-norm-1/LayerNorm/beta",
-            "encoder_build/encoder/layer-4/feed-forward/dense_gelu_dense/dense/bias",
-            "encoder_build/encoder/layer-2/add-and-norm-2/LayerNorm/beta",
-            "char_embedding",
-            "encoder_build/encoder/layer-6/self-attention/multi-head-output/dense/kernel",
-            "encoder_build/encoder/layer-3/self-attention/q_linear_projection/dense/kernel",
-            "encoder_build/encoder/layer-2/self-attention/multi-head-output/dense/bias",
-            "encoder_build/encoder/layer-6/self-attention/q_linear_projection/dense/kernel",
-            "encoder_build/encoder/GlobalAveragePooling-layer/self-attention/k_linear_projection/dense/kernel",
-            "encoder_build/encoder/layer-4/self-attention/q_linear_projection/dense/kernel",
-            "encoder_build/encoder/layer-1/self-attention/v_linear_projection/dense/kernel",
-            "encoder_build/encoder/layer-5/feed-forward/dense_gelu_dense/dense/kernel",
-            "encoder_build/encoder/layer-6/feed-forward/dense_gelu_dense_2/dense/bias",
-            "encoder_build/encoder/layer-2/add-and-norm-1/LayerNorm/beta",
-            "encoder_build/encoder/layer-7/feed-forward/dense_gelu_dense_2/dense/bias",
-            "encoder_build/encoder/layer-1/feed-forward/dense_gelu_dense_2/dense/kernel",
-            "encoder_build/encoder/GlobalAveragePooling-layer/self-attention/q_linear_projection/dense/kernel",
-            "encoder_build/encoder/layer-6/feed-forward/dense_gelu_dense_2/dense/kernel",
-            "encoder_build/encoder/layer-4/add-and-norm-1/LayerNorm/beta",
-            "encoder_build/encoder/layer-2/feed-forward/dense_gelu_dense_2/dense/bias",
-            "encoder_build/encoder/layer-3/add-and-norm-2/LayerNorm/gamma",
-            "encoder_build/encoder/layer-6/feed-forward/dense_gelu_dense/dense/bias",
-            "encoder_build/encoder/layer-4/add-and-norm-2/LayerNorm/beta",
-            "encoder_build/encoder/layer-4/self-attention/multi-head-output/dense/bias",
-            "encoder_build/encoder/layer-1/self-attention/multi-head-output/dense/bias",
-            "encoder_build/encoder/layer-4/self-attention/multi-head-output/dense/kernel",
-            "encoder_build/encoder/layer-2/self-attention/k_linear_projection/dense/kernel",
-            "encoder_build/encoder/layer-2/self-attention/multi-head-output/dense/kernel",
-            "encoder_build/encoder/layer-4/self-attention/v_linear_projection/dense/kernel",
-            "encoder_build/encoder/layer-6/self-attention/k_linear_projection/dense/kernel",
-            "encoder_build/encoder/layer-3/self-attention/multi-head-output/dense/kernel",
-            "encoder_build/encoder/layer-1/self-attention/multi-head-output/dense/kernel",
-            "encoder_build/encoder/layer-7/self-attention/v_linear_projection/dense/kernel",
-            "encoder_build/encoder/layer-3/feed-forward/dense_gelu_dense/dense/bias",
-            "encoder_build/encoder/layer-3/feed-forward/dense_gelu_dense/dense/kernel",
-            "encoder_build/encoder/layer-1/add-and-norm-2/LayerNorm/beta",
-            "encoder_build/encoder/layer-7/add-and-norm-2/LayerNorm/beta",
-            "encoder_build/encoder/layer-1/feed-forward/dense_gelu_dense/dense/bias",
-            "encoder_build/encoder/layer-3/self-attention/multi-head-output/dense/bias",
-            "encoder_build/encoder/layer-3/add-and-norm-2/LayerNorm/beta",
-            "encoder_build/encoder/layer-7/add-and-norm-1/LayerNorm/gamma",
-            "encoder_build/encoder/layer-7/feed-forward/dense_gelu_dense/dense/kernel",
-            "encoder_build/encoder/layer-5/add-and-norm-1/LayerNorm/beta",
-            "encoder_build/encoder/layer-6/add-and-norm-2/LayerNorm/gamma",
-            "encoder_build/encoder/layer-4/feed-forward/dense_gelu_dense_2/dense/bias",
-            "encoder_build/encoder/GlobalAveragePooling-layer/self-attention/v_linear_projection/dense/kernel",
-            "encoder_build/encoder/layer-7/add-and-norm-1/LayerNorm/beta",
-            "encoder_build/encoder/layer-5/self-attention/q_linear_projection/dense/kernel",
-            "encoder_build/encoder/layer-5/self-attention/v_linear_projection/dense/kernel",
-            "encoder_build/encoder/layer-7/self-attention/multi-head-output/dense/bias",
-            "encoder_build/encoder/layer-3/add-and-norm-1/LayerNorm/gamma",
-            "encoder_build/encoder/layer-3/self-attention/v_linear_projection/dense/kernel",
-            "encoder_build/encoder/layer-5/add-and-norm-1/LayerNorm/gamma",
-            "encoder_build/encoder/layer-3/add-and-norm-1/LayerNorm/beta",
-            "encoder_build/encoder/layer-2/feed-forward/dense_gelu_dense/dense/kernel",
-            "encoder_build/encoder/layer-7/self-attention/q_linear_projection/dense/kernel",
-            "encoder_build/encoder/layer-5/feed-forward/dense_gelu_dense_2/dense/kernel",
-            "encoder_build/encoder/layer-1/add-and-norm-1/LayerNorm/beta",
-            "encoder_build/encoder/layer-4/self-attention/k_linear_projection/dense/kernel",
-            "word_embedding",
-            "encoder_build/encoder/layer-6/add-and-norm-1/LayerNorm/gamma",
-            "encoder_build/encoder/layer-4/feed-forward/dense_gelu_dense_2/dense/kernel",
-            "encoder_build/encoder/layer-7/self-attention/k_linear_projection/dense/kernel",
-            "encoder_build/encoder/layer-2/self-attention/q_linear_projection/dense/kernel",
-            "encoder_build/beta2_power",
-            "encoder_build/encoder/layer-1/add-and-norm-2/LayerNorm/gamma",
-            "Variable"]
-        variables_to_restore = tf.contrib.slim.get_variables_to_restore(include=include)
-        saver = tf.train.Saver(variables_to_restore)
-        """
         saver = tf.train.Saver()
         
  
@@ -595,10 +497,11 @@ class Model:
                               batch_size=self.batch_size)
         encoder_emb = self.build_embed(word_inputs, char_inputs, char_len, char_mode)
         with tf.variable_scope("encoder_build",reuse=tf.AUTO_REUSE) as scope:
-            encoder_outputs = encoder.build(encoder_emb, seq_len ,model_type)
+            loss,encoder_outputs = encoder.build(encoder_emb, seq_len ,labels,self.word_embedding ,model_type)
             print("predict_outputs",encoder_outputs) 
             print("labels",labels)
-            loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = encoder_outputs , labels = labels)) # Softmax loss
+            #loss = encoder_outputs
+            #loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = encoder_outputs , labels = labels)) # Softmax loss
             optimizer=tf.cond(tf.equal(tf.constant(1.0),model_type),lambda:tf.train.AdamOptimizer(learning_rate=pre_train_learning_rate).minimize(loss, global_step=pre_train1_global_step),#pre_train1_model_dim_train1_global_step) # Adam Optimizer
                     lambda:tf.train.AdamOptimizer(learning_rate=train_learning_rate).minimize(loss, global_step=train_global_step))#train_global_step) # Adam Optimizer
             
@@ -669,41 +572,90 @@ def get_batch(train_X, train_X_char, train_X_char_len, train_Y, seq_length, batc
     train_batch_X_seq_len = seq_length[step*batch_size : (step+1)*batch_size]
     step += 1
     return train_batch_X, train_batch_X_char, train_batch_X_char_len, train_batch_Y, train_batch_X_seq_len
-def get_masked_lm_output(bert_config, input_tensor, output_weights, positions,
-    label_ids, label_weights):
-    #to get masked Lm loss and log prob""      
-    # only need the msked Token's output
-    input_tensor = gather_indexes(input_tensor, positions)
-    with tf.variable_scope("cls/predictions"):
-        # add an unlieanr dense before output and such parameters are used to train not fine-tune
-        with tf.variable_scope("transform"):
-            input_tensor = tf.layers.dense(
-                    input_tensor,
-                    units=bert_config.hidden_size,
-                    activation=modeling.get_activation(bert_config.hidden_act),
-                    kernel_initializer=modeling.create_initializer(
-                        bert_config.initializer_range))
-            input_tensor = modeling.layer_norm(input_tensor)
-            # output_weights reuse the input's word Embedding so it comes from canshu
-            # oone more bias
-            output_bias = tf.get_variable(
-                    "output_bias",
-                    shape=[bert_config.vocab_size],
-                    initializer=tf.zeros_initializer())
-            logits = tf.matmul(input_tensor, output_weights, transpose_b=True)
-            logits = tf.nn.bias_add(logits, output_bias)
-            log_probs = tf.nn.log_softmax(logits, axis=-1)
+def gather_indexes(sequence_tensor, positions):
+  """Gathers the vectors at the specific positions over a minibatch."""
+  sequence_shape = modeling.get_shape_list(sequence_tensor, expected_rank=3)
+  batch_size = sequence_shape[0]
+  seq_length = sequence_shape[1]
+  width = sequence_shape[2]
 
-        # label_ids length is 20, represent the max number of MASked Token
-        # label_ids represents the id of MASKed Token
-        label_ids = tf.reshape(label_ids, [-1])
-        label_weights = tf.reshape(label_weights, [-1])
-        one_hot_labels = tf.one_hot(
-                label_ids, depth=bert_config.vocab_size, dtype=tf.float32)
-        # actually the mASK number may less than 20, such as MASK18 so label_ids has two 0(padding)
-        # label_weights=[1, 1, ...., 0, 0],means that the last two label_id come from padding, and not in computiong of loss
-        per_example_loss = -tf.reduce_sum(log_probs * one_hot_labels, axis=[-1])
-        numerator = tf.reduce_sum(label_weights * per_example_loss)
-        denominator = tf.reduce_sum(label_weights) + 1e-5
-        loss = numerator / denominator
-        return (loss, per_example_loss, log_probs)
+  flat_offsets = tf.reshape(
+      tf.range(0, batch_size, dtype=tf.int32) * seq_length, [-1, 1])
+  flat_positions = tf.reshape(positions + flat_offsets, [-1])
+  flat_sequence_tensor = tf.reshape(sequence_tensor,
+                                    [batch_size * seq_length, width])
+  output_tensor = tf.gather(flat_sequence_tensor, flat_positions)
+def create_masked_lm_predictions(tokens, masked_lm_prob,
+                                 max_predictions_per_seq, vocab_words, rng):
+  """Creates the predictions for the masked LM objective."""
+
+  cand_indexes = []
+  for (i, token) in enumerate(tokens):
+    if token == "[CLS]" or token == "[SEP]":
+      continue
+    # Whole Word Masking means that if we mask all of the wordpieces
+    # corresponding to an original word. When a word has been split into
+    # WordPieces, the first token does not have any marker and any subsequence
+    # tokens are prefixed with ##. So whenever we see the ## token, we
+    # append it to the previous set of word indexes.
+    #
+    # Note that Whole Word Masking does *not* change the training code
+    # at all -- we still predict each WordPiece independently, softmaxed
+    # over the entire vocabulary.
+    if (FLAGS.do_whole_word_mask and len(cand_indexes) >= 1 and
+        token.startswith("##")):
+      cand_indexes[-1].append(i)
+    else:
+      cand_indexes.append([i])
+
+  rng.shuffle(cand_indexes)
+
+  output_tokens = list(tokens)
+
+  num_to_predict = min(max_predictions_per_seq,
+                       max(1, int(round(len(tokens) * masked_lm_prob))))
+
+  masked_lms = []
+  covered_indexes = set()
+  for index_set in cand_indexes:
+    if len(masked_lms) >= num_to_predict:
+      break
+    # If adding a whole-word mask would exceed the maximum number of
+    # predictions, then just skip this candidate.
+    if len(masked_lms) + len(index_set) > num_to_predict:
+      continue
+    is_any_index_covered = False
+    for index in index_set:
+      if index in covered_indexes:
+        is_any_index_covered = True
+        break
+    if is_any_index_covered:
+      continue
+    for index in index_set:
+      covered_indexes.add(index)
+
+      masked_token = None
+      # 80% of the time, replace with [MASK]
+      if rng.random() < 0.8:
+        masked_token = "[MASK]"
+      else:
+        # 10% of the time, keep original
+        if rng.random() < 0.5:
+          masked_token = tokens[index]
+        # 10% of the time, replace with random word
+        else:
+          masked_token = vocab_words[rng.randint(0, len(vocab_words) - 1)]
+
+      output_tokens[index] = masked_token
+
+      masked_lms.append(MaskedLmInstance(index=index, label=tokens[index]))
+  assert len(masked_lms) <= num_to_predict
+  masked_lms = sorted(masked_lms, key=lambda x: x.index)
+
+  masked_lm_positions = []
+  masked_lm_labels = []
+  for p in masked_lms:
+    masked_lm_positions.append(p.index)
+    masked_lm_labels.append(p.label)
+
+  return (output_tokens, masked_lm_positions, masked_lm_labels)

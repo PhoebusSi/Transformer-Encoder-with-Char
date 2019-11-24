@@ -58,7 +58,16 @@ class Preprocess():
                 self.pre_train3_seq_length=[]
                 self.pre_train3_Y=[]
         return self.train_X, self.train_seq_length, self.train_Y, self.test_X, self.test_seq_length, self.test_Y , self.pre_train1_X, self.pre_train1_seq_length, self.pre_train1_Y, self.pre_train2_X, self.pre_train2_seq_length, self.pre_train2_Y, self.pre_train3_X, self.pre_train3_seq_length, self.pre_train3_Y
-    
+    def load_mlm_data(self,mlm_X_filename,mlm_Y_filename,max_len):
+        print("Making MLM corpus!\nCould take few minutes!")
+        corpus_X = self.read_mlm_data(mlm_X_filename)
+        corpus_Y = self.read_mlm_data(mlm_Y_filename)
+        self.mlm_X ,self.mlm_seq_length = self.clean_mlm_text(corpus_X)
+        self.mlm_Y ,self.mlm_seq_length = self.clean_mlm_text(corpus_Y)
+        return self.mlm_X , self.mlm_Y, self.mlm_seq_length
+ 
+
+
     def read_data(self, filename):
         
         data = pd.read_csv(filename)      
@@ -74,6 +83,33 @@ class Preprocess():
         labels = encoder.transform(labels)
         labels = np.array([np.argmax(x) for x in labels])         
         return corpus, labels
+    def read_mlm_data(self,filename):
+        data = pd.read_csv(filename)
+        corpus = data.iloc[:0]
+        return corpus
+ 
+    def clean_mlm_text(self, corpus):             
+        tokens = []
+        index_list = []
+        seq_len = []
+        index = 0
+        for sent in corpus:
+            text = re.sub('<br />', ' ', sent)
+            text = re.sub('[^a-zA-Z]', ' ', sent)
+            t = [token for token in tokenize.word_tokenize(text) if not token in self.stop and len(token)>1 and len(token)<=20]
+
+            if(len(t) > self.max_sent_len):
+                t = t[0:self.max_sent_len]
+
+            if(len(t) > 10):
+                seq_len.append(len(t))
+                t = t + ['<pad>'] * (self.max_sent_len - len(t)) ## pad with max_len
+                tokens.append(t)
+                index_list.append(index)
+            index += 1
+            
+        #labels = labels[index_list]
+        return tokens, seq_len
     
     def clean_text(self, corpus, labels):             
         tokens = []
@@ -107,11 +143,59 @@ class Preprocess():
         
     def prepare_data(self, input_X, input_Y, mode):
         ## Data -> index
-        input_X_index = self.convert2index(input_X, "UNK")
+        input_X_index , _= self.convert2index(input_X, "UNK")
         input_X_char, input_X_char_len = self.sent2char(input_X, mode)
         input_X_index = np.array(input_X_index)
         input_Y = np.array(input_Y)
-        return input_X_index, input_X_char, input_X_char_len, input_Y
+        return input_X_index, input_X_char, input_X_char_len, input_Y 
+
+    def prepare_mlm_data_Y(self, input_mlm_Y, max_mask_len_per_sent,mask_positions, mode):
+        input_mlm_Y_index , _ = self.convert2index(input_mlm_Y,"UNK")
+        input_mlm_Y_char,input_mlm_Y_char_len = self.sent2char(input_mlm_Y , mode)
+        input_mlm_Y_index = np.arrray(input_mlm_Y_index)
+        sents_masked_ids=[]
+        for index_,sent in enumerate(input_mlm_Y_index):
+            masked_ids=[]
+            for i in mask_positions[index]:
+                if i==0:
+                    masked_ids.append(0)
+                else:
+                    masked_ids.append(sent[i])
+            sents_masked_ids.append(masked_ids)
+        return input_mlm_Y_index, input_mlm_Y_char, input_mlm_Y_char_len, sents_masked_ids
+
+
+
+
+    def prepare_mlm_data_X(self, input_mlm_X, max_mask_len_per_sent, mode):
+        input_mlm_X_index , mask_positions = self.convert2index(input_mlm_X,"UNK")
+        input_mlm_X_char,input_mlm_X_char_len = self.sent2char(input_mlm_X , mode)
+        input_mlm_X_index = np.arrray(input_mlm_X_index)
+        pad_mask_positions=[]
+        pad_mask_weights = []
+        for j in mask_positions:
+            tmp=[]
+            tmp2 = []
+            if len(j) >= max_mask_len_per_sent:
+                tmp =j[:max_mask_len_per_sent-1]
+                tmp2 = np.ones(max_mask_len_per_sent) 
+            else:
+                for i in range(max_mask_len_per_sent):
+                    if i <= len(j)-1:
+                        tmp.append(j[i])
+                        tmp2.append(1)
+                    else:
+                        tmp.append(0)
+                        tmp2.append(0)
+            pad_mask_positions.append(tmp)
+            pad_mask_weights.append(tmp2)
+            assert len(j) == max_mask_len_per_sent 
+        return input_mlm_X_index , input_mlm_X_char, input_mlm_X_char_len , pad_mask_positions , pad_mask_weights
+
+
+
+
+
 
     def get_word_embedding(self, filename = "./polyglot-en.pkl"):
         print("Getting polyglot embeddings!")
@@ -125,9 +209,13 @@ class Preprocess():
     
     def convert2index(self, doc, unk = "UNK"):
         word_index = []
+        mask_positions = []
         for sent in doc:
             sub = []
-            for word in sent:
+            pos = []
+            for ind,word in enumerate(sent):
+                if word == "[MASK]":
+                    pos.append(ind)
                 if(word in self.vocabulary):
                     index = self.vocabulary[word]
                     sub.append(index)
@@ -135,8 +223,9 @@ class Preprocess():
                     if(unk == "UNK"):
                         unk_index = self.vocabulary["<UNK>"]
                         sub.append(unk_index)   
-            word_index.append(sub)           
-        return word_index
+            word_index.append(sub) 
+            mask_positions.append(pos)
+        return word_index,mask_positions 
 
     def get_char_list(self,tokens):
         if os.path.exists("./char_list.csv"):

@@ -35,7 +35,11 @@ class Encoder:
         self.pre_n_class = pre_n_class
         self.batch_size = batch_size
         print("\ntransformer_outputs_Class_Number",self.pre_n_class,self.n_class)
-    def build(self, encoder_inputs, seq_len ,model_type):
+    def to_get_loss(self,all_words_logits,logits,labels,word_embedding,model_type):
+            loss_1 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = logits , labels = labels)) # Softmax loss
+            loss_mlm =   get_masked_lm_output(bert_config, all_words_logits, word_embedding, positions,label_ids, label_weights):
+            return loss
+    def build(self, encoder_inputs, seq_len ,labels,word_embedding,model_type):
         def Tensor2Layer( tensor):
              return tensor
         o1 = tf.identity(encoder_inputs)
@@ -48,6 +52,12 @@ class Encoder:
                                                                  seq_len=seq_len), num=1)
                 o3 = self._add_and_norm(o2, self._positional_feed_forward(o2), num=2)
                 o1 = tf.identity(o3)
+        #o1-o2-o3 here is [64,100,64]
+        #[batch_size,seq_length,hidden_size]
+        #o3 is the representation of the whole sents ,adn the following pooling layer 
+        #has the shape [64,4] 4 is the number of heads!
+        print("OOOOOOO3",o3,"00000001",o1,"000000002",o2)
+        all_words_logits = o1
         def dense_layer(num,layer):
             #return lambda:Dense(num)(layer)
             return Dense(num)(layer)
@@ -55,6 +65,7 @@ class Encoder:
         with tf.variable_scope("GlobalAveragePooling-layer"):
             o3 = self._pooling_layer(q=o1, k=o1, v=o1, seq_len =seq_len)
             #o3 = Lambda(Tensor2Layer)(o3)
+            print("OOOOOOO3",o3,"00000001",o1,"000000002",o2)
             #logits=tf.cond(tf.equal(tf.constant(1.0),model_type),lambda: Dense(self.pre_n_class)(o3),lambda: Dense(self.n_class)(o3))#self.n_class)#.item()
             #logits=tf.cond(tf.equal(tf.constant(1.0),model_type),lambda: dense_layer(self.pre_n_class,o3),lambda: dense_layer(self.n_class,o3))#self.n_class)#.item()
             a = dense_layer(self.pre_n_class,o3)
@@ -63,6 +74,7 @@ class Encoder:
             #logits=K.switch(tf.equal(tf.constant(1.0),model_type), a,b)#dense_layer(self.pre_n_class,o3), dense_layer(self.n_class,o3))
             logits = tf.cond(tf.equal(tf.constant(1.0),model_type),lambda:a,lambda:b)
             #logits=tf.cond(tf.equal(tf.constant(1),model_type),lambda: Dense(inputs=o3, units=self.pre_n_class, activation=None),lambda: Dense(inputs=o3, units=self.n_class, activation=None))#self.n_class)#.item()
+            # logits is the predictions for labels of pre_training1 and train!
             """
             if tf.equal(tf.constant(1),model_type):
                 units_number=self.pre_n_class
@@ -71,8 +83,10 @@ class Encoder:
             """
             print('\n\nunits_number:',logits)
             #logits= tf.layers.dense(inputs=o3, units=units_number.item(), activation=None) 
-        return logits
-
+            loss = self.to_get_loss(all_words_logits,logits,labels,word_embedding,model_type)
+            #loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = logits , labels = labels)) # Softmax loss
+        return loss,logits
+        #loss is loss; logits is predictions ; o3 is the outputs of transformer(logits)
 
     def _pooling_layer(self, q, k, v, seq_len):
         with tf.variable_scope("self-attention"):
@@ -106,3 +120,41 @@ class Encoder:
                       w2_dim=self.model_dim,
                       dropout=self.dropout)
             return ffn.dense_gelu_dense(output)
+def get_masked_lm_output(bert_config, input_tensor, output_weights, positions,
+    label_ids, label_weights):
+    #to get masked Lm loss and log prob""      
+    # only need the msked Token's output
+    input_tensor = gather_indexes(input_tensor, positions)
+    with tf.variable_scope("cls/predictions"):
+        # add an unlieanr dense before output and such parameters are used to train not fine-tune
+        with tf.variable_scope("transform"):
+            input_tensor = tf.layers.dense(
+                    input_tensor,
+                    units=bert_config.hidden_size,
+                    activation=modeling.get_activation(bert_config.hidden_act),
+                    kernel_initializer=modeling.create_initializer(
+                        bert_config.initializer_range))
+            input_tensor = modeling.layer_norm(input_tensor)
+            # output_weights reuse the input's word Embedding so it comes from canshu
+            # oone more bias
+            output_bias = tf.get_variable(
+                    "output_bias",
+                    shape=[bert_config.vocab_size],
+                    initializer=tf.zeros_initializer())
+            logits = tf.matmul(input_tensor, output_weights, transpose_b=True)
+            logits = tf.nn.bias_add(logits, output_bias)
+            log_probs = tf.nn.log_softmax(logits, axis=-1)
+
+        # label_ids length is 20, represent the max number of MASked Token
+        # label_ids represents the id of MASKed Token
+        label_ids = tf.reshape(label_ids, [-1])
+        label_weights = tf.reshape(label_weights, [-1])
+        one_hot_labels = tf.one_hot(
+                label_ids, depth=bert_config.vocab_size, dtype=tf.float32)
+        # actually the mASK number may less than 20, such as MASK18 so label_ids has two 0(padding)
+        # label_weights=[1, 1, ...., 0, 0],means that the last two label_id come from padding, and not in computiong of loss
+        per_example_loss = -tf.reduce_sum(log_probs * one_hot_labels, axis=[-1])
+        numerator = tf.reduce_sum(label_weights * per_example_loss)
+        denominator = tf.reduce_sum(label_weights) + 1e-5
+        loss = numerator / denominator
+        return (loss, per_example_loss, log_probs)
