@@ -23,6 +23,7 @@ class Preprocess():
         self.char_dim = char_dim
         self.max_sent_len = max_sent_len
         self.max_char_len = max_char_len
+        self.vocab_size = self.get_word_embedding()
         self.stop = set(stopwords.words('english'))
         self.stop.update(['.', ',', '"', "'", '?', '!', ':', ';', '(', ')', '[', ']', '{', '}', ""])
 
@@ -41,7 +42,7 @@ class Preprocess():
                 self.pre_train1_X=[]
                 self.pre_train1_seq_length=[]
                 self.pre_train1_Y=[]
-
+        print("yyyy",corpus)
         if len(pre_train2_filename):
                 corpus, labels = self.read_data(pre_train2_filename)
                 self.pre_train2_X, self.pre_train2_seq_length, self.pre_train2_Y = self.clean_text(corpus, labels)
@@ -62,6 +63,7 @@ class Preprocess():
         print("Making MLM corpus!\nCould take few minutes!")
         corpus_X = self.read_mlm_data(mlm_X_filename)
         corpus_Y = self.read_mlm_data(mlm_Y_filename)
+        print("xxxx",corpus_X)
         self.mlm_X ,self.mlm_seq_length = self.clean_mlm_text(corpus_X)
         self.mlm_Y ,self.mlm_seq_length = self.clean_mlm_text(corpus_Y)
         return self.mlm_X , self.mlm_Y, self.mlm_seq_length
@@ -85,7 +87,7 @@ class Preprocess():
         return corpus, labels
     def read_mlm_data(self,filename):
         data = pd.read_csv(filename)
-        corpus = data.iloc[:0]
+        corpus = data.iloc[:,0]
         return corpus
  
     def clean_mlm_text(self, corpus):             
@@ -135,7 +137,7 @@ class Preprocess():
         return tokens, seq_len, labels
     
     def prepare_embedding(self, char_dim):
-        self.get_word_embedding() ## Get pretrained word embedding        
+        #self.get_word_embedding() ## Get pretrained word embedding        
         tokens = self.train_X + self.test_X        
         self.get_char_list(tokens)  ## build char dict 
         self.get_char_embedding(char_dim, len(self.char_list)) ## Get char embedding
@@ -152,7 +154,7 @@ class Preprocess():
     def prepare_mlm_data_Y(self, input_mlm_Y, max_mask_len_per_sent,mask_positions, mode):
         input_mlm_Y_index , _ = self.convert2index(input_mlm_Y,"UNK")
         input_mlm_Y_char,input_mlm_Y_char_len = self.sent2char(input_mlm_Y , mode)
-        input_mlm_Y_index = np.arrray(input_mlm_Y_index)
+        input_mlm_Y_index = np.array(input_mlm_Y_index)
         sents_masked_ids=[]
         for index_,sent in enumerate(input_mlm_Y_index):
             masked_ids=[]
@@ -170,7 +172,7 @@ class Preprocess():
     def prepare_mlm_data_X(self, input_mlm_X, max_mask_len_per_sent, mode):
         input_mlm_X_index , mask_positions = self.convert2index(input_mlm_X,"UNK")
         input_mlm_X_char,input_mlm_X_char_len = self.sent2char(input_mlm_X , mode)
-        input_mlm_X_index = np.arrray(input_mlm_X_index)
+        input_mlm_X_index = np.array(input_mlm_X_index)
         pad_mask_positions=[]
         pad_mask_weights = []
         for j in mask_positions:
@@ -189,7 +191,8 @@ class Preprocess():
                         tmp2.append(0)
             pad_mask_positions.append(tmp)
             pad_mask_weights.append(tmp2)
-            assert len(j) == max_mask_len_per_sent 
+            #print (len(tmp), max_mask_len_per_sent,"are we equal?")
+            assert len(tmp) == max_mask_len_per_sent 
         return input_mlm_X_index , input_mlm_X_char, input_mlm_X_char_len , pad_mask_positions , pad_mask_weights
 
 
@@ -206,7 +209,8 @@ class Preprocess():
         self.reverse_vocabulary = dict(zip(self.vocabulary.values(), self.vocabulary.keys()))
         self.index2vec = vector
         self.word_embedding = tf.get_variable(name="word_embedding", shape=vector.shape, initializer=tf.constant_initializer(vector), trainable=True)
-        self.vocab_size = len(words) 
+        vocab_size = len(words) 
+        return  vocab_size
     def convert2index(self, doc, unk = "UNK"):
         word_index = []
         mask_positions = []

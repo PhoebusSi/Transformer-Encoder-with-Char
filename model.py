@@ -33,14 +33,14 @@ class Model:
         self.hidden_act = hidden_act
         ## Preprocess data
         self.prepro = preprocess.Preprocess(self.char_dim, self.max_sent_len, self.max_char_len)
-        self.vocab_size = preprocess.vocab_size
+        self.vocab_size = self.prepro.vocab_size
         self.train_X, self.train_seq_length, self.train_Y, self.test_X, self.test_seq_length, self.test_Y ,self.pre_train1_X, self.pre_train1_seq_length, self.pre_train1_Y,self.pre_train2_X, self.pre_train2_seq_length, self.pre_train2_Y,self.pre_train3_X, self.pre_train3_seq_length, self.pre_train3_Y = self.prepro.load_data("./low_resource_AG_DATA/train100.csv", "./low_resource_AG_DATA/test.csv", self.max_sent_len,pre_train1_filename="./low_resource_AG_DATA/train100.csv")#TC_data_5topic.csv")
         self.mlm_X ,self.mlm_Y, self.mlm_seq_length = self.prepro.load_mlm_data("./low_resource_AG_DATA/maskedLM/MLM_data_mask_5topic.csv","./low_resource_AG_DATA/maskedLM/MLM_data_raw_5topic.csv",self.max_sent_len)
         self.word_embedding, self.char_embedding = self.prepro.prepare_embedding(self.char_dim)
         self.train_X, self.train_X_char, self.train_X_char_len, self.train_Y = self.prepro.prepare_data(self.train_X, self.train_Y, "train")
         self.test_X, self.test_X_char, self.test_X_char_len, self.test_Y = self.prepro.prepare_data(self.test_X, self.test_Y, "test")
         self.mlm_X, self.mlm_X_char, self.mlm_X_char_len, self.mlm_positions,self.mlm_mask_weights = self.prepro.prepare_mlm_data_X(self.mlm_X, self.max_mask_words_per_sent, "mlm_pretrain_mask_X")
-        self.mlm_Y, self.mlm_Y_char, self.mlm_Y_char_len, self.mlm_mask_words = self.prepro.prepare_mlm_Y(self.mlm_Y, self.max_mask_words_per_sent,self.mlm_positions,"mlm_pretrain_Y")
+        self.mlm_Y, self.mlm_Y_char, self.mlm_Y_char_len, self.mlm_mask_words = self.prepro.prepare_mlm_data_Y(self.mlm_Y, self.max_mask_words_per_sent,self.mlm_positions,"mlm_pretrain_Y")
         #print("xxx?",self.pre_train1_seq_length)
         if len(self.pre_train1_seq_length):
                 self.pre_train1_X, self.pre_train1_X_char, self.pre_train1_X_char_len, self.pre_train1_Y = self.prepro.prepare_data(self.pre_train1_X, self.pre_train1_Y, "pre_train1")
@@ -502,8 +502,8 @@ class Model:
                               dropout=self.dropout,
                               n_class=self.n_class,
                               pre_n_class=self.pre_train1_n_class,
-                              batch_size=self.batch_size
-                              hidden_act = self.hidden_act
+                              batch_size=self.batch_size,
+                              hidden_act = self.hidden_act,
                               vocab_size = self.vocab_size)
         encoder_emb = self.build_embed(word_inputs, char_inputs, char_len, char_mode)
         with tf.variable_scope("encoder_build",reuse=tf.AUTO_REUSE) as scope:

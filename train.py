@@ -35,6 +35,7 @@ if __name__ == '__main__':
     flags.DEFINE_integer('model_dim', 64*2, 'output dimension of transformer encoder')
     flags.DEFINE_integer('ffn_dim', 64*2, 'dimension of feed forward network')
     flags.DEFINE_integer('n_class', 4, 'number of output class')
+    flags.DEFINE_integer('max_mask_words_per_sent', 20, 'the max number f mask per sentence')
     flags.DEFINE_integer('pre_train1_n_class', 5, 'number of pre_train1_output class')
     flags.DEFINE_bool('bool_pre_train1', True, 'whether undergoing pre_train1')
     flags.DEFINE_string('char_mode', 'no_char', 'mode of character embedding')
@@ -46,7 +47,7 @@ if __name__ == '__main__':
     print('========================')
     ## Build model
     t_model = model.Model(FLAGS.word_dim, FLAGS.char_dim, FLAGS.max_sent_len, FLAGS.max_char_len, 
-                           FLAGS.pre_train_learning_rate, FLAGS.train_learning_rate,FLAGS.num_pre_train1_steps,FLAGS.num_train_steps,FLAGS.hidden_act)
+                           FLAGS.pre_train_learning_rate, FLAGS.train_learning_rate,FLAGS.num_pre_train1_steps,FLAGS.num_train_steps,FLAGS.max_mask_words_per_sent,FLAGS.hidden_act)
     
     
     t_model.build_parameter(FLAGS.num_layers, FLAGS.num_heads, FLAGS.linear_key_dim, FLAGS.linear_value_dim,
@@ -57,7 +58,7 @@ if __name__ == '__main__':
     
     #t_model.pre_train1 (FLAGS.batch_size, FLAGS.pre_training1_epochs, FLAGS.char_mode)
     loss, optimizer, logits, learning_rate ,pre_train1_Step,train_Step= t_model.build_model(t_model.word_input, t_model.char_input, t_model.label, t_model.seq_len,
-                                                   t_model.char_len, t_model.num_pre_train1_steps, t_model.num_train_steps, FLAGS.char_mode,t_model.model_type)
+                                                   t_model.char_len, t_model.num_pre_train1_steps, t_model.num_train_steps, t_model.mlm_mask_positions, t_model.mlm_mask_words,t_model.mlm_mask_weights,FLAGS.char_mode,t_model.model_type)
     #t_model.train(FLAGS.batch_size, FLAGS.training_epochs, FLAGS.char_mode, sess,loss, optimizer, logits)
     print('\n\nloss',loss,'learning_rate',learning_rate,"\n")
     if FLAGS.pre_training1_epochs: 
