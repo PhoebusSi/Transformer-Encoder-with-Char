@@ -38,6 +38,7 @@ if __name__ == '__main__':
     flags.DEFINE_integer('pre_train1_n_class', 5, 'number of pre_train1_output class')
     flags.DEFINE_bool('bool_pre_train1', True, 'whether undergoing pre_train1')
     flags.DEFINE_string('char_mode', 'no_char', 'mode of character embedding')
+    flags.DEFINE_string('hidden_act', 'gelu', 'mode of the activation of Encoder')
     
     print('========================')
     for key in FLAGS.__flags.keys():
@@ -45,7 +46,7 @@ if __name__ == '__main__':
     print('========================')
     ## Build model
     t_model = model.Model(FLAGS.word_dim, FLAGS.char_dim, FLAGS.max_sent_len, FLAGS.max_char_len, 
-                           FLAGS.pre_train_learning_rate, FLAGS.train_learning_rate,FLAGS.num_pre_train1_steps,FLAGS.num_train_steps)
+                           FLAGS.pre_train_learning_rate, FLAGS.train_learning_rate,FLAGS.num_pre_train1_steps,FLAGS.num_train_steps,FLAGS.hidden_act)
     
     
     t_model.build_parameter(FLAGS.num_layers, FLAGS.num_heads, FLAGS.linear_key_dim, FLAGS.linear_value_dim,

@@ -156,7 +156,7 @@ class Preprocess():
         sents_masked_ids=[]
         for index_,sent in enumerate(input_mlm_Y_index):
             masked_ids=[]
-            for i in mask_positions[index]:
+            for i in mask_positions[index_]:
                 if i==0:
                     masked_ids.append(0)
                 else:
@@ -206,7 +206,7 @@ class Preprocess():
         self.reverse_vocabulary = dict(zip(self.vocabulary.values(), self.vocabulary.keys()))
         self.index2vec = vector
         self.word_embedding = tf.get_variable(name="word_embedding", shape=vector.shape, initializer=tf.constant_initializer(vector), trainable=True)
-    
+        self.vocab_size = len(words) 
     def convert2index(self, doc, unk = "UNK"):
         word_index = []
         mask_positions = []

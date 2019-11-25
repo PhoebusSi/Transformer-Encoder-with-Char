@@ -19,7 +19,7 @@ config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 class Model:
 
-    def __init__(self, word_dim, char_dim, max_sent_len, max_char_len, pre_train_learning_rate,train_learning_rate,num_pre_train1_steps, num_train_steps,max_mask_words_per_sent):
+    def __init__(self, word_dim, char_dim, max_sent_len, max_char_len, pre_train_learning_rate,train_learning_rate,num_pre_train1_steps, num_train_steps,max_mask_words_per_sent,hidden_act):
         
         self.word_dim = word_dim
         self.char_dim = char_dim
@@ -30,9 +30,10 @@ class Model:
         self.num_train_steps = num_train_steps
         self.num_pre_train1_steps = num_pre_train1_steps
         self.max_mask_words_per_sent = max_mask_words_per_sent 
-
+        self.hidden_act = hidden_act
         ## Preprocess data
         self.prepro = preprocess.Preprocess(self.char_dim, self.max_sent_len, self.max_char_len)
+        self.vocab_size = preprocess.vocab_size
         self.train_X, self.train_seq_length, self.train_Y, self.test_X, self.test_seq_length, self.test_Y ,self.pre_train1_X, self.pre_train1_seq_length, self.pre_train1_Y,self.pre_train2_X, self.pre_train2_seq_length, self.pre_train2_Y,self.pre_train3_X, self.pre_train3_seq_length, self.pre_train3_Y = self.prepro.load_data("./low_resource_AG_DATA/train100.csv", "./low_resource_AG_DATA/test.csv", self.max_sent_len,pre_train1_filename="./low_resource_AG_DATA/train100.csv")#TC_data_5topic.csv")
         self.mlm_X ,self.mlm_Y, self.mlm_seq_length = self.prepro.load_mlm_data("./low_resource_AG_DATA/maskedLM/MLM_data_mask_5topic.csv","./low_resource_AG_DATA/maskedLM/MLM_data_raw_5topic.csv",self.max_sent_len)
         self.word_embedding, self.char_embedding = self.prepro.prepare_embedding(self.char_dim)
@@ -61,6 +62,9 @@ class Model:
         self.mlm_mask_weights = tf.placeholder(tf.float32,shape = [None, self.max_mask_words_per_sent],name = 'mask_pos') 
         
         self.word_input = tf.cast(self.word_input,tf.int32)
+        self.mlm_mask_positions = tf.cast(self.mlm_mask_positions,tf.int32)
+        self.mlm_mask_words = tf.cast(self.mlm_mask_words,tf.int32)
+        self.mlm_mask_weights= tf.cast(self.mlm_mask_weights,tf.int32)
         self.char_input = tf.cast(self.char_input,tf.int32)
         self.label = tf.cast(self.label,tf.int32)
         self.seq_len = tf.cast(self.seq_len,tf.int32)
@@ -498,7 +502,9 @@ class Model:
                               dropout=self.dropout,
                               n_class=self.n_class,
                               pre_n_class=self.pre_train1_n_class,
-                              batch_size=self.batch_size)
+                              batch_size=self.batch_size
+                              hidden_act = self.hidden_act
+                              vocab_size = self.vocab_size)
         encoder_emb = self.build_embed(word_inputs, char_inputs, char_len, char_mode)
         with tf.variable_scope("encoder_build",reuse=tf.AUTO_REUSE) as scope:
             loss,encoder_outputs = encoder.build(encoder_emb, seq_len ,labels,self.word_embedding , mlm_mask_positions,mlm_mask_words,mlm_mask_weights,model_type)
