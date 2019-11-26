@@ -43,7 +43,7 @@ class Encoder:
     def to_get_loss(self,all_words_logits,logits,labels,word_embedding,mlm_mask_positions,mlm_mask_words,mlm_mask_weights,model_type):
             loss_1 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = logits , labels = labels)) # Softmax loss
             loss_mlm ,_,_=   self.get_masked_lm_output( all_words_logits, word_embedding, mlm_mask_positions,mlm_mask_words, mlm_mask_weights)
-
+            loss = loss_1 +loss_mlm
             return loss
     def build(self, encoder_inputs, seq_len ,labels,word_embedding, mlm_mask_positions, mlm_mask_words,mlm_mask_weights,model_type):
         def Tensor2Layer( tensor):
@@ -159,6 +159,9 @@ class Encoder:
             # actually the mASK number may less than 20, such as MASK18 so label_ids has two 0(padding)
             # label_weights=[1, 1, ...., 0, 0],means that the last two label_id come from padding, and not in computiong of loss
             per_example_loss = -tf.reduce_sum(log_probs * one_hot_labels, axis=[-1])
+            print("label_weights:masked_weights",label_weights)
+            print("per_example_loss:mlm_loss",per_example_loss)
+            label_weights = tf.cast(label_weights,tf.float32)
             numerator = tf.reduce_sum(label_weights * per_example_loss)
             denominator = tf.reduce_sum(label_weights) + 1e-5
             loss = numerator / denominator

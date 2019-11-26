@@ -164,6 +164,7 @@ class Preprocess():
                 else:
                     masked_ids.append(sent[i])
             sents_masked_ids.append(masked_ids)
+            print("masked_ids",masked_ids)
         return input_mlm_Y_index, input_mlm_Y_char, input_mlm_Y_char_len, sents_masked_ids
 
 
@@ -176,22 +177,26 @@ class Preprocess():
         pad_mask_positions=[]
         pad_mask_weights = []
         for j in mask_positions:
+            #print("mask_postions",j)
             tmp=[]
             tmp2 = []
+            #print("j",j)
             if len(j) >= max_mask_len_per_sent:
-                tmp =j[:max_mask_len_per_sent-1]
+                tmp =j[:max_mask_len_per_sent]
                 tmp2 = np.ones(max_mask_len_per_sent) 
             else:
                 for i in range(max_mask_len_per_sent):
                     if i <= len(j)-1:
                         tmp.append(j[i])
-                        tmp2.append(1)
+                        tmp2.append(1.0)
                     else:
                         tmp.append(0)
-                        tmp2.append(0)
+                        tmp2.append(0.0)
             pad_mask_positions.append(tmp)
             pad_mask_weights.append(tmp2)
             #print (len(tmp), max_mask_len_per_sent,"are we equal?")
+            #print ("pad_mask_positions",tmp,"pad_mask_weights",tmp2)
+            #print("tmmmmp",len(tmp),max_mask_len_per_sent)
             assert len(tmp) == max_mask_len_per_sent 
         return input_mlm_X_index , input_mlm_X_char, input_mlm_X_char_len , pad_mask_positions , pad_mask_weights
 
@@ -218,13 +223,16 @@ class Preprocess():
             sub = []
             pos = []
             for ind,word in enumerate(sent):
-                if word == "[MASK]":
+                #if unk == "UK":
+                #    print("word",word)
+                if word == "MASK":
                     pos.append(ind)
                 if(word in self.vocabulary):
                     index = self.vocabulary[word]
                     sub.append(index)
                 else:
                     if(unk == "UNK"):
+                    #print("unk",unk)
                         unk_index = self.vocabulary["<UNK>"]
                         sub.append(unk_index)   
             word_index.append(sub) 
