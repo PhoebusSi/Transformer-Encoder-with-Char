@@ -63,9 +63,12 @@ class Preprocess():
         print("Making MLM corpus!\nCould take few minutes!")
         corpus_X = self.read_mlm_data(mlm_X_filename)
         corpus_Y = self.read_mlm_data(mlm_Y_filename)
-        print("xxxx",corpus_X)
+        print("xxxxxxxxxxxxxxx",corpus_X.shape,corpus_Y.shape)
+
         self.mlm_X ,self.mlm_seq_length = self.clean_mlm_text(corpus_X)
+
         self.mlm_Y ,self.mlm_seq_length = self.clean_mlm_text(corpus_Y)
+        print("yyyyyyyyyyyyyyy",len(self.mlm_X),len(self.mlm_Y))
         return self.mlm_X , self.mlm_Y, self.mlm_seq_length
  
 
@@ -98,12 +101,12 @@ class Preprocess():
         for sent in corpus:
             text = re.sub('<br />', ' ', sent)
             text = re.sub('[^a-zA-Z]', ' ', sent)
-            t = [token for token in tokenize.word_tokenize(text) if not token in self.stop and len(token)>1 and len(token)<=20]
+            t = [token for token in tokenize.word_tokenize(text) if not token in self.stop and len(token)>0 and len(token)<=20]
 
             if(len(t) > self.max_sent_len):
                 t = t[0:self.max_sent_len]
 
-            if(len(t) > 10):
+            if(len(t) > 0):
                 seq_len.append(len(t))
                 t = t + ['<pad>'] * (self.max_sent_len - len(t)) ## pad with max_len
                 tokens.append(t)
@@ -121,12 +124,12 @@ class Preprocess():
         for sent in corpus:
             text = re.sub('<br />', ' ', sent)
             text = re.sub('[^a-zA-Z]', ' ', sent)
-            t = [token for token in tokenize.word_tokenize(text) if not token in self.stop and len(token)>1 and len(token)<=20]
+            t = [token for token in tokenize.word_tokenize(text) if not token in self.stop and len(token)>0 and len(token)<=20]
 
             if(len(t) > self.max_sent_len):
                 t = t[0:self.max_sent_len]
 
-            if(len(t) > 10):
+            if(len(t) > 0):
                 seq_len.append(len(t))
                 t = t + ['<pad>'] * (self.max_sent_len - len(t)) ## pad with max_len
                 tokens.append(t)
@@ -145,7 +148,9 @@ class Preprocess():
         
     def prepare_data(self, input_X, input_Y, mode):
         ## Data -> index
+        print("aaaaaaaaaa",len(input_X))
         input_X_index , _= self.convert2index(input_X, "UNK")
+        print("aaaaaaaaaa_index",len(input_X_index))
         input_X_char, input_X_char_len = self.sent2char(input_X, mode)
         input_X_index = np.array(input_X_index)
         input_Y = np.array(input_Y)
@@ -157,6 +162,7 @@ class Preprocess():
         input_mlm_Y_index = np.array(input_mlm_Y_index)
         sents_masked_ids=[]
         for index_,sent in enumerate(input_mlm_Y_index):
+            #print("index",index_)
             masked_ids=[]
             for i in mask_positions[index_]:
                 if i==0:
@@ -164,7 +170,8 @@ class Preprocess():
                 else:
                     masked_ids.append(sent[i])
             sents_masked_ids.append(masked_ids)
-            print("masked_ids",masked_ids)
+            #print("masked_ids",masked_ids)
+        print("input_MLM_Y" ,len(input_mlm_Y),len(input_mlm_Y_index))
         return input_mlm_Y_index, input_mlm_Y_char, input_mlm_Y_char_len, sents_masked_ids
 
 

@@ -41,9 +41,15 @@ class Encoder:
         self.vocab_size = vocab_size
         print("\ntransformer_outputs_Class_Number",self.pre_n_class,self.n_class)
     def to_get_loss(self,all_words_logits,logits,labels,word_embedding,mlm_mask_positions,mlm_mask_words,mlm_mask_weights,model_type):
-            loss_1 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = logits , labels = labels)) # Softmax loss
-            loss_mlm ,_,_=   self.get_masked_lm_output( all_words_logits, word_embedding, mlm_mask_positions,mlm_mask_words, mlm_mask_weights)
-            loss = loss_1 +loss_mlm
+            #loss_1 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = logits , labels = labels)) # Softmax loss
+            #loss_mlm ,_,_=   self.get_masked_lm_output( all_words_logits, word_embedding, mlm_mask_positions,mlm_mask_words, mlm_mask_weights)
+            #loss_pre = loss_1 +loss_mlm
+            #loss=tf.cond(tf.equal(tf.constant(1.0),model_type),lambda:loss_pre,lambda:loss_1)
+            #fllowing loss is same as shown in 4 lines below, but the following way no need to exxcute firstly.            
+            loss=tf.cond(tf.equal(tf.constant(1.0),model_type),
+                    lambda:tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = logits , labels = labels))+
+                        self.get_masked_lm_output( all_words_logits, word_embedding, mlm_mask_positions,mlm_mask_words, mlm_mask_weights)[0],
+                        lambda:tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = logits , labels = labels)))
             return loss
     def build(self, encoder_inputs, seq_len ,labels,word_embedding, mlm_mask_positions, mlm_mask_words,mlm_mask_weights,model_type):
         def Tensor2Layer( tensor):

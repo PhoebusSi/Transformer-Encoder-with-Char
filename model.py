@@ -39,8 +39,8 @@ class Model:
         self.word_embedding, self.char_embedding = self.prepro.prepare_embedding(self.char_dim)
         self.train_X, self.train_X_char, self.train_X_char_len, self.train_Y = self.prepro.prepare_data(self.train_X, self.train_Y, "train")
         self.test_X, self.test_X_char, self.test_X_char_len, self.test_Y = self.prepro.prepare_data(self.test_X, self.test_Y, "test")
-        self.mlm_X, self.mlm_X_char, self.mlm_X_char_len, self.mlm_positions,self.mlm_mask_weights = self.prepro.prepare_mlm_data_X(self.mlm_X, self.max_mask_words_per_sent, "mlm_pretrain_mask_X")
-        self.mlm_Y, self.mlm_Y_char, self.mlm_Y_char_len, self.mlm_mask_words = self.prepro.prepare_mlm_data_Y(self.mlm_Y, self.max_mask_words_per_sent,self.mlm_positions,"mlm_pretrain_Y")
+        self.mlm_X, self.mlm_X_char, self.mlm_X_char_len, self.mlm_positions,self.mlm_weights = self.prepro.prepare_mlm_data_X(self.mlm_X, self.max_mask_words_per_sent, "mlm_pretrain_mask_X")
+        self.mlm_Y, self.mlm_Y_char, self.mlm_Y_char_len, self.mlm_words = self.prepro.prepare_mlm_data_Y(self.mlm_Y, self.max_mask_words_per_sent,self.mlm_positions,"mlm_pretrain_Y")
         #print("xxx?",self.pre_train1_seq_length)
         if len(self.pre_train1_seq_length):
                 self.pre_train1_X, self.pre_train1_X_char, self.pre_train1_X_char_len, self.pre_train1_Y = self.prepro.prepare_data(self.pre_train1_X, self.pre_train1_Y, "pre_train1")
@@ -50,33 +50,33 @@ class Model:
         if len(self.pre_train3_seq_length):
                 self.pre_train3_X, self.pre_train3_X_char, self.pre_train3_X_char_len, self.pre_train3_Y = self.prepro.prepare_data(self.pre_train3_X, self.pre_train3_Y, "pre_train3")
         ## Placeholders
-        self.word_input = tf.placeholder(tf.float32, shape = [None, max_sent_len], name = 'word')
-        self.mlm_word_input = tf.placeholder(tf.float32, shape = [None, max_sent_len], name = 'mlm_word')
-        self.char_input = tf.placeholder(tf.float32, shape = [None, max_sent_len, max_char_len], name = 'char')
+        self.word_input = tf.placeholder(tf.int32, shape = [None, max_sent_len], name = 'word')
+        self.mlm_word_input = tf.placeholder(tf.int32, shape = [None, max_sent_len], name = 'mlm_word')
+        self.char_input = tf.placeholder(tf.int32, shape = [None, max_sent_len, max_char_len], name = 'char')
         self.mlm_char_input = tf.placeholder(tf.float32, shape = [None, max_sent_len, max_char_len], name = 'mlm_X_char')
-        self.label = tf.placeholder(tf.float32, shape = [None], name = 'label')
-        self.seq_len = tf.placeholder(tf.float32, shape = [None])
-        self.mlm_seq_len = tf.placeholder(tf.float32, shape = [None])
-        self.char_len = tf.placeholder(tf.float32, [None, max_sent_len])
-        self.mlm_char_len = tf.placeholder(tf.float32, [None, max_sent_len])
+        self.label = tf.placeholder(tf.int32, shape = [None], name = 'label')
+        self.seq_len = tf.placeholder(tf.int32, shape = [None])
+        self.mlm_seq_len = tf.placeholder(tf.int32, shape = [None])
+        self.char_len = tf.placeholder(tf.int32, [None, max_sent_len])
+        self.mlm_char_len = tf.placeholder(tf.int32, [None, max_sent_len])
         self.dropout = tf.placeholder(tf.float32, shape = ())
         self.model_type = tf.placeholder(tf.float32, shape = ()) 
-        self.mlm_mask_positions = tf.placeholder(tf.float32,shape = [None, self.max_mask_words_per_sent],name = 'mask_pos') 
-        self.mlm_mask_words = tf.placeholder(tf.float32,shape = [None, self.max_mask_words_per_sent],name = 'mask_pos') 
-        self.mlm_mask_weights = tf.placeholder(tf.float32,shape = [None, self.max_mask_words_per_sent],name = 'mask_pos') 
+        self.mlm_mask_positions = tf.placeholder(tf.int32,shape = [None, self.max_mask_words_per_sent],name = 'mask_pos') 
+        self.mlm_mask_words = tf.placeholder(tf.int32,shape = [None, self.max_mask_words_per_sent],name = 'mask_ids') 
+        self.mlm_mask_weights = tf.placeholder(tf.float32,shape = [None, self.max_mask_words_per_sent],name = 'mask_weights') 
         
-        self.word_input = tf.cast(self.word_input,tf.int32)
-        self.mlm_word_input = tf.cast(self.mlm_word_input,tf.int32)
-        self.mlm_mask_positions = tf.cast(self.mlm_mask_positions,tf.int32)
-        self.mlm_mask_words = tf.cast(self.mlm_mask_words,tf.int32)
-        self.mlm_mask_weights= tf.cast(self.mlm_mask_weights,tf.int32)
-        self.char_input = tf.cast(self.char_input,tf.int32)
-        self.mlm_char_input = tf.cast(self.mlm_char_input,tf.int32)
-        self.label = tf.cast(self.label,tf.int32)
-        self.seq_len = tf.cast(self.seq_len,tf.int32)
-        self.mlm_seq_len = tf.cast(self.mlm_seq_len,tf.int32)
-        self.char_len = tf.cast(self.char_len,tf.int32)
-        self.mlm_char_len = tf.cast(self.mlm_char_len,tf.int32)
+        #self.word_input = tf.cast(self.word_input,tf.int32)
+        #self.mlm_word_input = tf.cast(self.mlm_word_input,tf.int32)
+        #self.mlm_mask_positions = tf.cast(self.mlm_mask_positions,tf.int32)
+        #self.mlm_mask_words = tf.cast(self.mlm_mask_words,tf.int32)
+        #self.mlm_mask_weights= tf.cast(self.mlm_mask_weights,tf.int32)
+        #self.char_input = tf.cast(self.char_input,tf.int32)
+        #self.mlm_char_input = tf.cast(self.mlm_char_input,tf.int32)
+        #self.label = tf.cast(self.label,tf.int32)
+        #self.seq_len = tf.cast(self.seq_len,tf.int32)
+        #self.mlm_seq_len = tf.cast(self.mlm_seq_len,tf.int32)
+        #self.char_len = tf.cast(self.char_len,tf.int32)
+        #self.mlm_char_len = tf.cast(self.mlm_char_len,tf.int32)
         
     """
     def pre_train(self, batch_size, training_epochs, char_mode):
@@ -133,16 +133,18 @@ class Model:
             for epoch in range(training_epochs):
         
                 train_acc, train_loss = 0., 0.       
+                print ('epocj_max_X_char_len before  VS before pre_train1_X ',self.mlm_X_char_len.shape , self.pre_train1_X.shape, self.pre_train1_X_char.shape)
                 self.pre_train1_X, self.pre_train1_X_char, self.pre_train1_X_char_len, self.pre_train1_Y = self.shuffle(self.pre_train1_X, 
                                                                                                     self.pre_train1_X_char, 
                                                                                                     self.pre_train1_X_char_len, 
                                                                                                     self.pre_train1_Y)
-                self.mlm_X, self.mlm_X_char, self.mlm_X_char_len, self.mlm_mask_positions,self.mlm_mask_words,self.mlm_mask_weights = self.shuffle_mlm(self.mlm_X,
+                print ('after pre_train1_X ' , self.pre_train1_X.shape)
+                self.mlm_X, self.mlm_X_char, self.mlm_X_char_len, self.mlm_shuffle_positions,self.mlm_shuffle_words,self.mlm_shuffle_weights = self.shuffle_mlm(self.mlm_X,
                         self.mlm_X_char, 
                         self.mlm_X_char_len, 
-                        self.mlm_mask_positions, 
-                        self.mlm_mask_words, 
-                        self.mlm_mask_weights)
+                        self.mlm_positions, 
+                        self.mlm_words, 
+                        self.mlm_weights)
                 """
                 self.train_X, self.train_X_char, self.train_X_char_len, self.train_Y = self.shuffle(self.pre_train1_X, 
                                                                                                     self.pre_train1_X_char, 
@@ -163,12 +165,11 @@ class Model:
                                                                                                                                                  self.batch_size,
                                                                                                                                                  mode)           
                     """
-                
                     train_batch,train_batch_char,train_batch_char_len,train_batch_Y,train_batch_seq_len,mlm_batch_X,mlm_batch_X_char,mlm_batch_X_char_len, mlm_batch_X_seq_len,mlm_batch_mask_positions,mlm_batch_mask_words,mlm_batch_mask_weights = get_mlm_batch(
-                            self.pre_traini1_X, self.pre_train1_X_char, self.pre_train1_X_char_len, 
-                            self.pre_train1_Y, self.pre_train1_seq_length,
-                            self.mlm_X, self.mlm_X_char,self.mlm_X_cahr_len,
-                            self.mlm_mask_positions,self.mlm_mask_words,self.mlm_mask_weights,self.mlm_seq_length, batch_size,
+                            self.pre_train1_X, self.pre_train1_X_char, self.pre_train1_X_char_len, 
+                            self.pre_train1_Y, self.pre_train1_seq_length, batch_size,
+                            self.mlm_X, self.mlm_X_char,self.mlm_X_char_len,
+                            self.mlm_shuffle_positions,self.mlm_shuffle_words,self.mlm_shuffle_weights,self.mlm_seq_length,
                             mode = None)
                     """
                     train_batch, train_batch_char, train_batch_char_len, train_batch_Y, train_batch_seq_len = get_batch(self.pre_train1_X, 
@@ -178,9 +179,10 @@ class Model:
                                                                                                                         self.pre_train1_seq_length,
                                                                                                                         self.batch_size,
                                                                                                                         mode)           
-                    """
                     print("\ntrain_batch_Y",train_batch_Y)
                     """
+                    print ("mlm_mask_postions",mlm_batch_mask_positions.shape)
+                    """ 
                     feed_dict_train = {self.word_input: train_batch, self.char_input : train_batch_char, self.label: train_batch_Y,
                                        self.seq_len: train_batch_seq_len, self.char_len: train_batch_char_len, self.dropout : 0.2, self.model_type:1.0}
                     """
@@ -214,8 +216,12 @@ class Model:
                                                                                                                    self.test_seq_length,
                                                                                                                    self.batch_size,
                                                                                                                    mode)
+                    mlm_batch_positions_for_test,mlm_batch_words_for_test,mlm_batch_weights_for_test=self.get_empty_mlm_specail_batch(self.batch_size,self.max_mask_words_per_sent)
                     feed_dict_test = {self.word_input: test_batch, self.char_input: test_batch_char, self.label: test_batch_Y, 
-                                      self.seq_len: test_batch_seq_len, self.char_len: test_batch_char_len, self.dropout : 0.0,self.model_type:4.0}
+                                      self.seq_len: test_batch_seq_len, self.char_len: test_batch_char_len, self.dropout : 0.0,self.model_type:4.0,
+                                      self.mlm_word_input: mlm_batch_X, self.mlm_char_input: mlm_batch_X_char, self.mlm_seq_len : mlm_batch_X_seq_len,
+                                      self.mlm_char_len: mlm_batch_X_char_len, self.mlm_mask_positions:mlm_batch_positions_for_test, self.mlm_mask_words:mlm_batch_words_for_test,
+                                      self.mlm_mask_weights:mlm_batch_weights_for_test}
                     # Compute average loss
                     test_batch_loss = sess.run(loss, feed_dict = feed_dict_test)
                     test_loss += test_batch_loss / num_test_batch
@@ -315,8 +321,17 @@ class Model:
                                                                                                                         self.train_seq_length,
                                                                                                                         self.batch_size,
                                                                                                                         mode)           
+                    mlm_batch_positions_for_test,mlm_batch_words_for_test,mlm_batch_weights_for_test=self.get_empty_mlm_specail_batch(self.batch_size,self.max_mask_words_per_sent)
                     feed_dict_train = {self.word_input: train_batch, self.char_input : train_batch_char, self.label: train_batch_Y,
-                                       self.seq_len: train_batch_seq_len, self.char_len: train_batch_char_len, self.dropout : 0.2,self.model_type:4.0}
+                                       self.seq_len: train_batch_seq_len, self.char_len: train_batch_char_len, self.dropout : 0.2,self.model_type:4.0,
+                                       self.mlm_word_input: train_batch, self.mlm_char_input: train_batch_char, self.mlm_seq_len : train_batch_seq_len,
+                                       self.mlm_char_len: train_batch_char_len, self.mlm_mask_positions:mlm_batch_positions_for_test, self.mlm_mask_words:mlm_batch_words_for_test,
+                                       self.mlm_mask_weights:mlm_batch_weights_for_test}
+                    #feed_dict_train = {self.word_input: train_batch, self.char_input : train_batch_char, self.label: train_batch_Y,
+                    #                  self.seq_len: train_batch_seq_len, self.char_len: train_batch_char_len, self.dropout : 0.2,self.model_type:4.0,
+                    #                   self.mlm_word_input: mlm_batch_X, self.mlm_char_input: mlm_batch_X_char, self.mlm_seq_len : mlm_batch_X_seq_len,
+                    #                   self.mlm_char_len: mlm_batch_X_char_len, self.mlm_mask_positions:mlm_batch_mask_positions, self.mlm_mask_words:mlm_batch_mask_words,
+                    #                   self.mlm_mask_weights:mlm_batch_mask_weights}
                     
                     char_embedding_matrix = sess.run(self.prepro.clear_char_embedding_padding, feed_dict = feed_dict_train) ## clear 0 index to 0 vector
                     _, train_batch_loss ,learning_rate_num,pre_train1_Step_num,train_Step_num = sess.run([optimizer,loss,learning_rate,pre_train1_Step,train_Step], feed_dict = feed_dict_train)
@@ -340,8 +355,14 @@ class Model:
                                                                                                                    self.test_seq_length,
                                                                                                                    self.batch_size,
                                                                                                                    mode)
+                    mlm_batch_positions_for_test,mlm_batch_words_for_test,mlm_batch_weights_for_test=self.get_empty_mlm_specail_batch(self.batch_size,self.max_mask_words_per_sent)
                     feed_dict_test = {self.word_input: test_batch, self.char_input: test_batch_char, self.label: test_batch_Y, 
-                                      self.seq_len: test_batch_seq_len, self.char_len: test_batch_char_len, self.dropout : 0.0,self.model_type:4.0}
+                                      self.seq_len: test_batch_seq_len, self.char_len: test_batch_char_len, self.dropout : 0.0,self.model_type:4.0,
+                                      self.mlm_word_input: test_batch, self.mlm_char_input: test_batch_char, self.mlm_seq_len : test_batch_seq_len,
+                                      self.mlm_char_len: test_batch_char_len, self.mlm_mask_positions:mlm_batch_positions_for_test, self.mlm_mask_words:mlm_batch_words_for_test,
+                                      self.mlm_mask_weights:mlm_batch_weights_for_test}
+                    #feed_dict_test = {self.word_input: test_batch, self.char_input: test_batch_char, self.label: test_batch_Y, 
+                    #                  self.seq_len: test_batch_seq_len, self.char_len: test_batch_char_len, self.dropout : 0.0,self.model_type:4.0}
                     # Compute average loss
                     test_batch_loss = sess.run(loss, feed_dict = feed_dict_test)
                     test_loss += test_batch_loss / num_test_batch
@@ -550,7 +571,11 @@ class Model:
             print("\nLEARNING_RATE",learning_rate)
             #learning_rate = tf.constant([learning_rate])
         return loss, optimizer, encoder_outputs , learning_rate,pre_train1_global_step,train_global_step
-    
+    def get_empty_mlm_specail_batch(self,batch_size,max_mask_words_per_sent):
+        positions= np.zeros([batch_size,max_mask_words_per_sent]).astype('int32')
+        ids= np.zeros([batch_size,max_mask_words_per_sent]).astype('int32')
+        weights= np.zeros([batch_size,max_mask_words_per_sent]).astype('float32')
+        return positions,ids,weights
     def build_embed(self, word_inputs, char_inputs, char_len, char_mode):
         
         # Positional Encoding
@@ -588,20 +613,31 @@ class Model:
     
     def shuffle(self, train_X, train_X_char, train_X_char_len, train_Y):
         mask = np.random.permutation(len(train_X))
+        print("normal_train_X",train_X_char.shape)
         train_X = train_X[mask]
         train_X_char = train_X_char[mask]
+        print("normal_shuffle_",train_X_char_len.shape)
         train_X_char_len = train_X_char_len[mask]
+        print("normal_shuffle_",train_X_char_len.shape)
         train_Y = train_Y[mask]
         return train_X, train_X_char, train_X_char_len, train_Y
-    def shuffle_mlm(self, mlm_X, mlm_X_char, mlm_X_char_len, mlm_positions, mlm_mask_words, mlm_mask_weights):
+    def shuffle_mlm(self, mlm_X, mlm_X_char, mlm_X_char_len, mlm_positions, mlm_words, mlm_weights):
         mask = np.random.permutation(len(mlm_X))
+        print("mask",len(mask),mask)
         mlm_X = mlm_X[mask]
         mlm_X_char = mlm_X_char[mask]
+
+        print("mlm_X_char_len",mlm_X_char_len.shape,mlm_X_char_len)
         mlm_X_char_len = mlm_X_char_len[mask]
+        mlm_positions = np.array(mlm_positions)
+        mlm_words = np.array(mlm_words)
+        mlm_weights = np.array(mlm_weights)
+        print("mlm_X_char_len_",len(mlm_X_char_len),mlm_X_char_len,"\nmlm_positions",mlm_positions)
+        print("mlm_X_char_len_",mlm_positions.shape,mlm_words.shape,mlm_weights.shape,"\nmlm_positions",mlm_positions)
         mlm_positions = mlm_positions[mask]
-        mlm_mask_words = mlm_mask_words[mask]
-        mlm_mask_weights = mlm_mask_weights[mask]
-        return mlm_X, mlm_X_char, mlm_X_char_len, mlm_positions, mlm_mask_words, mlm_mask_weights
+        mlm_words = mlm_words[mask]
+        mlm_weights = mlm_weights[mask]
+        return mlm_X, mlm_X_char, mlm_X_char_len, mlm_positions, mlm_words, mlm_weights
     
     def load_char_embedding(self, filename):
         print("Char embedding loaded!")
@@ -610,10 +646,13 @@ class Model:
 
 step = 0
 def get_mlm_batch(train_X, train_X_char, train_X_char_len, train_Y, seq_length, batch_size,
-        mlm_X, mlm_X_char,mlm_Y_char_len,mlm_mask_positions,mlm_mask_words,mlm_mask_weights,mlm_seq_length, mode = None):
+        mlm_X, mlm_X_char,mlm_X_char_len,mlm_mask_positions,mlm_mask_words,mlm_mask_weights,mlm_seq_length, mode = None):
     global step
     if(mode =="init"):
         step = 0
+    print("train_batch_X",train_X.shape,train_X)
+    print("step",step)
+    print("batch_size",batch_size,step*batch_size,(step+1)*batch_size)
     train_batch_X = train_X[step*batch_size : (step+1)*batch_size]
     train_batch_X_char = train_X_char[step*batch_size : (step+1)*batch_size]
     train_batch_X_char_len = train_X_char_len[step*batch_size : (step+1)*batch_size]
@@ -621,6 +660,7 @@ def get_mlm_batch(train_X, train_X_char, train_X_char_len, train_Y, seq_length, 
     mlm_batch_X = mlm_X[step*batch_size : (step+1)*batch_size]
     mlm_batch_X_char = mlm_X_char[step*batch_size : (step+1)*batch_size]
     mlm_batch_X_char_len = mlm_X_char_len[step*batch_size : (step+1)*batch_size]
+
     mlm_batch_mask_positions = mlm_mask_positions[step*batch_size : (step+1)*batch_size]
     mlm_batch_mask_words = mlm_mask_words[step*batch_size : (step+1)*batch_size]
     mlm_batch_mask_weights = mlm_mask_weights[step*batch_size : (step+1)*batch_size]
@@ -632,6 +672,8 @@ def get_batch(train_X, train_X_char, train_X_char_len, train_Y, seq_length, batc
     global step
     if(mode =="init"):
         step = 0
+    print("step",step)
+    print("batch_size",batch_size,step*batch_size,(step+1)*batch_size)
     train_batch_X = train_X[step*batch_size : (step+1)*batch_size]
     train_batch_X_char = train_X_char[step*batch_size : (step+1)*batch_size]
     train_batch_X_char_len = train_X_char_len[step*batch_size : (step+1)*batch_size]
