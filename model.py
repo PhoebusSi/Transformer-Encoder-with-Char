@@ -34,9 +34,10 @@ class Model:
         ## Preprocess data
         self.prepro = preprocess.Preprocess(self.char_dim, self.max_sent_len, self.max_char_len)
         self.vocab_size = self.prepro.vocab_size
-        self.train_X, self.train_seq_length, self.train_Y, self.test_X, self.test_seq_length, self.test_Y ,self.pre_train1_X, self.pre_train1_seq_length, self.pre_train1_Y,self.pre_train2_X, self.pre_train2_seq_length, self.pre_train2_Y,self.pre_train3_X, self.pre_train3_seq_length, self.pre_train3_Y = self.prepro.load_data("./low_resource_AG_DATA/train100.csv", "./low_resource_AG_DATA/test.csv", self.max_sent_len,pre_train1_filename="./low_resource_AG_DATA/train100.csv")#TC_data_5topic.csv")
+        self.train_X, self.train_seq_length, self.train_Y, self.test_X, self.test_seq_length, self.test_Y ,self.pre_train1_X, self.pre_train1_seq_length, self.pre_train1_Y,self.pre_train2_X, self.pre_train2_seq_length, self.pre_train2_Y,self.pre_train3_X, self.pre_train3_seq_length, self.pre_train3_Y = self.prepro.load_data("./low_resource_AG_DATA/train100.csv", "./low_resource_AG_DATA/test.csv", self.max_sent_len,pre_train1_filename="./low_resource_AG_DATA/TC_data_5topic.csv")
         self.mlm_X ,self.mlm_Y, self.mlm_seq_length = self.prepro.load_mlm_data("./low_resource_AG_DATA/maskedLM/MLM_data_mask_5topic.csv","./low_resource_AG_DATA/maskedLM/MLM_data_raw_5topic.csv",self.max_sent_len)
         self.word_embedding, self.char_embedding = self.prepro.prepare_embedding(self.char_dim)
+        print("word_embedding",self.word_embedding)
         self.train_X, self.train_X_char, self.train_X_char_len, self.train_Y = self.prepro.prepare_data(self.train_X, self.train_Y, "train")
         self.test_X, self.test_X_char, self.test_X_char_len, self.test_Y = self.prepro.prepare_data(self.test_X, self.test_Y, "test")
         self.mlm_X, self.mlm_X_char, self.mlm_X_char_len, self.mlm_positions,self.mlm_weights = self.prepro.prepare_mlm_data_X(self.mlm_X, self.max_mask_words_per_sent, "mlm_pretrain_mask_X")
@@ -152,6 +153,7 @@ class Model:
                                                                                                     self.pre_train1_Y)
                 """
                 for step in range(num_train_batch):
+                    print("\n\nSTEP",step,epoch)
                     if(step == 0):
                         mode = "init"
                     else:
@@ -171,6 +173,8 @@ class Model:
                             self.mlm_X, self.mlm_X_char,self.mlm_X_char_len,
                             self.mlm_shuffle_positions,self.mlm_shuffle_words,self.mlm_shuffle_weights,self.mlm_seq_length,
                             mode = None)
+                    print("train_batch",train_batch.shape,train_batch)
+                    #print("pre_train1",self.pre_train1_X.shape,self.pre_train1_X)
                     """
                     train_batch, train_batch_char, train_batch_char_len, train_batch_Y, train_batch_seq_len = get_batch(self.pre_train1_X, 
                                                                                                                         self.pre_train1_X_char, 
@@ -506,7 +510,7 @@ class Model:
         self.pre_train1_n_class=pre_train1_n_class
         self.bool_pre_train1 = bool_pre_train_1
         self.count = 1 # if model_dim has divided by 2 in pretrain1 ,then it keep itsalf in trainiing process
-    def build_model(self, word_inputs, char_inputs, labels, seq_len, char_len, num_pre_train1_steps, num_train_steps,mlm_mask_positions,mlm_mask_words, mlm_mask_weights,char_mode, model_type):
+    def build_model(self, word_inputs, char_inputs, labels, seq_len, char_len, num_pre_train1_steps, num_train_steps,mlm_word_inputs,mlm_char_inputs,mlm_char_len,mlm_mask_positions,mlm_mask_words, mlm_mask_weights,char_mode, model_type):
         print("Building model!")
         print("\nchar mode here is ",char_mode)
         gate = tf.constant(0)
@@ -557,8 +561,9 @@ class Model:
                               hidden_act = self.hidden_act,
                               vocab_size = self.vocab_size)
         encoder_emb = self.build_embed(word_inputs, char_inputs, char_len, char_mode)
+        mlm_encoder_emb =self.build_embed(mlm_word_inputs , mlm_char_inputs, mlm_char_len, char_mode)
         with tf.variable_scope("encoder_build",reuse=tf.AUTO_REUSE) as scope:
-            loss,encoder_outputs = encoder.build(encoder_emb, seq_len ,labels,self.word_embedding , mlm_mask_positions,mlm_mask_words,mlm_mask_weights,model_type)
+            loss,encoder_outputs = encoder.build(encoder_emb,mlm_encoder_emb, seq_len ,labels,self.word_embedding , mlm_mask_positions,mlm_mask_words,mlm_mask_weights,model_type)
             print("predict_outputs",encoder_outputs) 
             print("labels",labels)
             #loss = encoder_outputs
@@ -650,9 +655,9 @@ def get_mlm_batch(train_X, train_X_char, train_X_char_len, train_Y, seq_length, 
     global step
     if(mode =="init"):
         step = 0
-    print("train_batch_X",train_X.shape,train_X)
-    print("step",step)
-    print("batch_size",batch_size,step*batch_size,(step+1)*batch_size)
+    #print("train_batch_X",train_X.shape,train_X)
+    #print("step",step)
+    #print("batch_size",batch_size,step*batch_size,(step+1)*batch_size)
     train_batch_X = train_X[step*batch_size : (step+1)*batch_size]
     train_batch_X_char = train_X_char[step*batch_size : (step+1)*batch_size]
     train_batch_X_char_len = train_X_char_len[step*batch_size : (step+1)*batch_size]
@@ -672,8 +677,8 @@ def get_batch(train_X, train_X_char, train_X_char_len, train_Y, seq_length, batc
     global step
     if(mode =="init"):
         step = 0
-    print("step",step)
-    print("batch_size",batch_size,step*batch_size,(step+1)*batch_size)
+    #print("step",step)
+    #print("batch_size",batch_size,step*batch_size,(step+1)*batch_size)
     train_batch_X = train_X[step*batch_size : (step+1)*batch_size]
     train_batch_X_char = train_X_char[step*batch_size : (step+1)*batch_size]
     train_batch_X_char_len = train_X_char_len[step*batch_size : (step+1)*batch_size]
