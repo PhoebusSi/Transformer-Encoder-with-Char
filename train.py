@@ -19,10 +19,10 @@ if __name__ == '__main__':
     flags.DEFINE_integer('char_dim', 15, 'dimension of character vector')
     flags.DEFINE_integer('max_sent_len', 100, 'max length of words of sentences')
     flags.DEFINE_integer('max_char_len', 16, 'max length of characters of words')
-    flags.DEFINE_float('train_learning_rate', 0.00015, 'initial learning rate')
-    flags.DEFINE_float('pre_train_learning_rate', 0.001, 'initial learning rate')
-    flags.DEFINE_integer('num_train_steps', 900, 'number of training steps for learning rate decay')
-    flags.DEFINE_integer('num_pre_train1_steps', 4000, 'number of training steps for learning rate decay')
+    flags.DEFINE_float('train_learning_rate', 0.0001, 'initial learning rate')
+    flags.DEFINE_float('pre_train_learning_rate', 0.0005, 'initial learning rate')
+    flags.DEFINE_integer('num_train_steps', 600, 'number of training steps for learning rate decay')
+    flags.DEFINE_integer('num_pre_train1_steps', 2000, 'number of training steps for learning rate decay')
     flags.DEFINE_integer('batch_size', 64, 'number of batch size')
     #flags.DEFINE_integer('pre_batch_size', 64, 'number of batch size')
     flags.DEFINE_integer('training_epochs', 12, 'number of training epochs')
@@ -57,12 +57,12 @@ if __name__ == '__main__':
     t_model.batch_size = FLAGS.batch_size
     
     #t_model.pre_train1 (FLAGS.batch_size, FLAGS.pre_training1_epochs, FLAGS.char_mode)
-    loss, optimizer, logits, learning_rate ,pre_train1_Step,train_Step= t_model.build_model(t_model.word_input, t_model.char_input, t_model.label, t_model.seq_len,
+    loss, mlm_loss,optimizer, logits, learning_rate ,pre_train1_Step,train_Step= t_model.build_model(t_model.word_input, t_model.char_input, t_model.label, t_model.seq_len,
                                                    t_model.char_len, t_model.num_pre_train1_steps, t_model.num_train_steps,t_model.mlm_word_input,t_model.mlm_char_input,t_model.mlm_char_len, t_model.mlm_mask_positions, t_model.mlm_mask_words,t_model.mlm_mask_weights,FLAGS.char_mode,t_model.model_type)
     #t_model.train(FLAGS.batch_size, FLAGS.training_epochs, FLAGS.char_mode, sess,loss, optimizer, logits)
     print('\n\nloss',loss,'learning_rate',learning_rate,"\n")
     if FLAGS.pre_training1_epochs: 
-        t_model.pre_train1 (FLAGS.batch_size, FLAGS.pre_training1_epochs, FLAGS.char_mode,loss,optimizer,logits,learning_rate,pre_train1_Step,train_Step)
+        t_model.pre_train1 (FLAGS.batch_size, FLAGS.pre_training1_epochs, FLAGS.char_mode,loss,mlm_loss,optimizer,logits,learning_rate,pre_train1_Step,train_Step)
     
     #tf.reset_default_graph()
     """

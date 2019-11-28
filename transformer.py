@@ -46,11 +46,13 @@ class Encoder:
             #loss_pre = loss_1 +loss_mlm
             #loss=tf.cond(tf.equal(tf.constant(1.0),model_type),lambda:loss_pre,lambda:loss_1)
             #fllowing loss is same as shown in 4 lines below, but the following way no need to exxcute firstly.            
+            mlm_loss = tf.cond(tf.equal(tf.constant(1.0),model_type),lambda:self.get_masked_lm_output( mlm_all_words_logits, word_embedding, mlm_mask_positions,mlm_mask_words, mlm_mask_weights)[0],
+                    lambda:tf.constant(1.0))
             loss=tf.cond(tf.equal(tf.constant(1.0),model_type),
                     lambda:tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = logits , labels = labels))+
                         self.get_masked_lm_output( mlm_all_words_logits, word_embedding, mlm_mask_positions,mlm_mask_words, mlm_mask_weights)[0],
                         lambda:tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = logits , labels = labels)))
-            return loss
+            return loss,mlm_loss
     def build(self, encoder_inputs, mlm_encoder_inputs,seq_len ,labels,word_embedding, mlm_mask_positions, mlm_mask_words,mlm_mask_weights,model_type):
         def Tensor2Layer( tensor):
              return tensor
@@ -106,10 +108,12 @@ class Encoder:
             """
             print('\n\nunits_number:',logits)
             #logits= tf.layers.dense(inputs=o3, units=units_number.item(), activation=None) 
-            loss = self.to_get_loss(logits,mlm_all_words_logits,labels,word_embedding,mlm_mask_positions,mlm_mask_words,mlm_mask_weights,model_type)
+            loss,mlm_loss = self.to_get_loss(logits,mlm_all_words_logits,labels,word_embedding,mlm_mask_positions,mlm_mask_words,mlm_mask_weights,model_type)
             #loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = logits , labels = labels)) # Softmax loss
-        return loss,logits
-        #loss is loss; logits is predictions ; o3 is the outputs of transformer(logits)
+        return loss,logits,mlm_loss
+        #loss is loss; logits is predictions in classification task ;
+        #mlm_loss is the loss for  the mlm task , return it to show whether it getting stability
+        #o3 is the outputs of transformer(logits)
 
     def _pooling_layer(self, q, k, v, seq_len):
         with tf.variable_scope("self-attention"):

@@ -42,6 +42,8 @@ class Model:
         self.test_X, self.test_X_char, self.test_X_char_len, self.test_Y = self.prepro.prepare_data(self.test_X, self.test_Y, "test")
         self.mlm_X, self.mlm_X_char, self.mlm_X_char_len, self.mlm_positions,self.mlm_weights = self.prepro.prepare_mlm_data_X(self.mlm_X, self.max_mask_words_per_sent, "mlm_pretrain_mask_X")
         self.mlm_Y, self.mlm_Y_char, self.mlm_Y_char_len, self.mlm_words = self.prepro.prepare_mlm_data_Y(self.mlm_Y, self.max_mask_words_per_sent,self.mlm_positions,"mlm_pretrain_Y")
+        self.mlm_positons,self.mlm_words,self.mlm_weights = self.prepro.mlm_fix_mask(self.max_mask_words_per_sent,self.mlm_positions,self.mlm_words,self.mlm_weights)
+        
         #print("xxx?",self.pre_train1_seq_length)
         if len(self.pre_train1_seq_length):
                 self.pre_train1_X, self.pre_train1_X_char, self.pre_train1_X_char_len, self.pre_train1_Y = self.prepro.prepare_data(self.pre_train1_X, self.pre_train1_Y, "pre_train1")
@@ -88,7 +90,7 @@ class Model:
         train_seq_length = self.pre_train1_seq_length
         train(self, batch_size, training_epochs, char_mode)
     """
-    def pre_train1(self, batch_size, training_epochs, char_mode,loss,optimizer,logits,learning_rate,pre_train1_Step,train_Step):
+    def pre_train1(self, batch_size, training_epochs, char_mode,loss,mlm_loss,optimizer,logits,learning_rate,pre_train1_Step,train_Step):
         self.batch_size = batch_size
         """
         loss, optimizer, logits= self.build_model(self.word_input, self.char_input, self.label, self.seq_len, 
@@ -110,6 +112,7 @@ class Model:
         
         train_acc_list = []
         train_loss_list = []
+        train_mlm_loss_list = []
         test_acc_list = []
         test_loss_list = []
         
@@ -133,7 +136,7 @@ class Model:
             ## training    
             for epoch in range(training_epochs):
         
-                train_acc, train_loss = 0., 0.       
+                train_acc, train_loss,train_mlm_loss = 0., 0., 0.   
                 print ('epocj_max_X_char_len before  VS before pre_train1_X ',self.mlm_X_char_len.shape , self.pre_train1_X.shape, self.pre_train1_X_char.shape)
                 self.pre_train1_X, self.pre_train1_X_char, self.pre_train1_X_char_len, self.pre_train1_Y = self.shuffle(self.pre_train1_X, 
                                                                                                     self.pre_train1_X_char, 
@@ -197,13 +200,14 @@ class Model:
                                        self.mlm_mask_weights:mlm_batch_mask_weights
                                        }
                     char_embedding_matrix = sess.run(self.prepro.clear_char_embedding_padding, feed_dict = feed_dict_train) ## clear 0 index to 0 vector
-                    _, train_batch_loss , learning_rate_num,pre_train1_Step_num,train_Step_num= sess.run([optimizer,loss,learning_rate,pre_train1_Step,train_Step], feed_dict = feed_dict_train)
+                    _, train_batch_loss ,train_batch_mlm_loss, learning_rate_num,pre_train1_Step_num,train_Step_num= sess.run([optimizer,loss, mlm_loss,learning_rate,pre_train1_Step,train_Step], feed_dict = feed_dict_train)
                     print("\ntrain_batch_Loss + train_batch_number",train_batch_loss, num_train_batch)          
-                    train_loss += train_batch_loss / num_train_batch          
+                    train_loss += train_batch_loss / num_train_batch        
+                    train_mlm_loss += train_batch_mlm_loss / num_train_batch        
                     train_batch_acc = sess.run(accuracy , feed_dict = feed_dict_train)
                     train_acc += train_batch_acc / num_train_batch
                     print("\ntrain_batch_predict",logits)
-                    print("epoch : {:02d} step : {:04d} loss = {:.6f} accuracy= {:.6f} learning_rate = {:.10f},pre_train1_step = {:02d},train_Step = {:02d}".format(epoch+1, step+1, train_batch_loss, train_batch_acc,learning_rate_num,pre_train1_Step_num,train_Step_num))
+                    print("epoch : {:02d} step : {:04d} loss = {:.6f} accuracy= {:.6f} mlm_loss = {:.6f} learning_rate = {:.10f},pre_train1_step = {:02d},train_Step = {:02d}".format(epoch+1, step+1, train_batch_loss, train_batch_acc, train_batch_mlm_loss, learning_rate_num,pre_train1_Step_num,train_Step_num))
 
                 
                 test_acc, test_loss = 0. , 0.
@@ -233,9 +237,11 @@ class Model:
                     test_batch_acc = sess.run(accuracy , feed_dict = feed_dict_test)
                     test_acc += test_batch_acc / num_test_batch
                     
-                print("<Train> Loss = {:.6f} Accuracy = {:.6f}".format(train_loss, train_acc))
+                print("<Train_all_in_Pretraining> Loss = {:.6f} Accuracy = {:.6f}".format(train_loss, train_acc))
+                print("<Train_mlm_in_Pretraining> Loss = {:.6f} Accuracy = {:.6f}".format(train_mlm_loss, train_acc))
                 print("<Test> Loss = {:.6f} Accuracy = {:.6f}".format(test_loss, test_acc))
                 train_loss_list.append(train_loss)
+                train_mlm_loss_list.append(train_mlm_loss)
                 train_acc_list.append(train_acc)
                 test_loss_list.append(test_loss)
                 test_acc_list.append(test_acc)
@@ -563,9 +569,10 @@ class Model:
         encoder_emb = self.build_embed(word_inputs, char_inputs, char_len, char_mode)
         mlm_encoder_emb =self.build_embed(mlm_word_inputs , mlm_char_inputs, mlm_char_len, char_mode)
         with tf.variable_scope("encoder_build",reuse=tf.AUTO_REUSE) as scope:
-            loss,encoder_outputs = encoder.build(encoder_emb,mlm_encoder_emb, seq_len ,labels,self.word_embedding , mlm_mask_positions,mlm_mask_words,mlm_mask_weights,model_type)
+            loss,encoder_outputs,mlm_loss = encoder.build(encoder_emb,mlm_encoder_emb, seq_len ,labels,self.word_embedding , mlm_mask_positions,mlm_mask_words,mlm_mask_weights,model_type)
             print("predict_outputs",encoder_outputs) 
             print("labels",labels)
+            print("mlm_loss",mlm_loss)
             #loss = encoder_outputs
             #loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = encoder_outputs , labels = labels)) # Softmax loss
             optimizer=tf.cond(tf.equal(tf.constant(1.0),model_type),lambda:tf.train.AdamOptimizer(learning_rate=pre_train_learning_rate).minimize(loss, global_step=pre_train1_global_step),#pre_train1_model_dim_train1_global_step) # Adam Optimizer
@@ -575,7 +582,7 @@ class Model:
                     lambda:pre_train_learning_rate,lambda:train_learning_rate)
             print("\nLEARNING_RATE",learning_rate)
             #learning_rate = tf.constant([learning_rate])
-        return loss, optimizer, encoder_outputs , learning_rate,pre_train1_global_step,train_global_step
+        return loss, mlm_loss, optimizer, encoder_outputs , learning_rate,pre_train1_global_step,train_global_step
     def get_empty_mlm_specail_batch(self,batch_size,max_mask_words_per_sent):
         positions= np.zeros([batch_size,max_mask_words_per_sent]).astype('int32')
         ids= np.zeros([batch_size,max_mask_words_per_sent]).astype('int32')
