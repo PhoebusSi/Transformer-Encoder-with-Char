@@ -74,7 +74,7 @@ class Preprocess():
 
 
     def read_data(self, filename):
-        
+        print(filename) 
         data = pd.read_csv(filename)      
         labels = data.iloc[:,0]
         print("\n\ndata.iloc[0]:",data.iloc[0])
@@ -170,7 +170,7 @@ class Preprocess():
                 else:
                     masked_ids.append(sent[i])
             sents_masked_ids.append(masked_ids)
-            print("masked_ids",masked_ids)
+            #print("masked_ids",masked_ids)
         print("input_MLM_Y" ,len(input_mlm_Y),len(input_mlm_Y_index))
         return input_mlm_Y_index, input_mlm_Y_char, input_mlm_Y_char_len, sents_masked_ids
 
@@ -221,6 +221,8 @@ class Preprocess():
                     pos.append(mlm_mask_positons[j][i])
                     words.append(word_id)
                     weights.append(mlm_mask_weights[j][i])
+            assert len(pos) == len(words)
+            assert len(words) == len(weights)
             for t in range(max_mask_len_per_sent-len(pos)):
                 pos.append(0)
                 words.append(0)
@@ -231,7 +233,7 @@ class Preprocess():
             new_mlm_mask_postions.append(pos)
             new_mlm_mask_words.append(words)
             new_mlm_mask_weights.append(weights)
-            print(pos,words,weights)
+            #print(pos,words,weights)
         return new_mlm_mask_postions,new_mlm_mask_words,new_mlm_mask_weights
 
 
@@ -245,8 +247,8 @@ class Preprocess():
         vector = np.append(np.zeros((1,64)),vector,axis=0)
         self.vocabulary = {word:index for index,word in enumerate(words)}
         self.reverse_vocabulary = dict(zip(self.vocabulary.values(), self.vocabulary.keys()))
-        print("VOCABULARY",self.reverse_vocabulary)
-        print(self.reverse_vocabulary[1])
+        #print("VOCABULARY",self.reverse_vocabulary)
+        #print(self.reverse_vocabulary[1])
         self.index2vec = vector
         self.word_embedding = tf.get_variable(name="word_embedding", shape=vector.shape, initializer=tf.constant_initializer(vector), trainable=True)
         vocab_size = len(words) 

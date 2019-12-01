@@ -13,14 +13,15 @@ import datetime
 import preprocess
 import pandas as pd
 from attention import positional_encoding
-
+#import os 
 #tf.reset_default_graph()
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 class Model:
 
-    def __init__(self, word_dim, char_dim, max_sent_len, max_char_len, pre_train_learning_rate,train_learning_rate,num_pre_train1_steps, num_train_steps,max_mask_words_per_sent,hidden_act):
-        
+    def __init__(self, data_type, labeled_data_num,topic_num, word_dim, char_dim, max_sent_len, max_char_len, pre_train_learning_rate,train_learning_rate,num_pre_train1_steps, num_train_steps,max_mask_words_per_sent,hidden_act):
+        self.labeled_data_num = labeled_data_num 
+        self.topic_num = topic_num
         self.word_dim = word_dim
         self.char_dim = char_dim
         self.max_sent_len = max_sent_len
@@ -34,8 +35,37 @@ class Model:
         ## Preprocess data
         self.prepro = preprocess.Preprocess(self.char_dim, self.max_sent_len, self.max_char_len)
         self.vocab_size = self.prepro.vocab_size
-        self.train_X, self.train_seq_length, self.train_Y, self.test_X, self.test_seq_length, self.test_Y ,self.pre_train1_X, self.pre_train1_seq_length, self.pre_train1_Y,self.pre_train2_X, self.pre_train2_seq_length, self.pre_train2_Y,self.pre_train3_X, self.pre_train3_seq_length, self.pre_train3_Y = self.prepro.load_data("./low_resource_AG_DATA/train100.csv", "./low_resource_AG_DATA/test.csv", self.max_sent_len,pre_train1_filename="./low_resource_AG_DATA/TC_data_5topic.csv")
-        self.mlm_X ,self.mlm_Y, self.mlm_seq_length = self.prepro.load_mlm_data("./low_resource_AG_DATA/maskedLM/MLM_data_mask_5topic.csv","./low_resource_AG_DATA/maskedLM/MLM_data_raw_5topic.csv",self.max_sent_len)
+        if data_type == 'ag':
+            base_dir = 'data/AG/'
+        elif data_type == 'imdb':
+            base_dir = 'data/IMBD/'
+        elif data_type == 'intent':
+            base_dir = 'data/Intent/'
+        test_file_path = base_dir+"test.csv"
+        train_file_path = base_dir + "low_resource/train{}.csv".format(labeled_data_num)
+        mlm_masked_file_path = base_dir + "pretrain_data_new/maskedLM/MLM_data_mask_{}topic.csv".format(topic_num)
+        mlm_raw_file_path = base_dir + "pretrain_data_new/maskedLM/MLM_data_raw_{}topic.csv".format(topic_num)
+        clf_file_path = base_dir + "pretrain_data_new/topic_calssification/TC_data_{}topic.csv".format(topic_num)
+        gen_inp_file_path = base_dir + "pretrain_data_new/topicBased_generation/TBG_data_input_{}topic.csv".format(topic_num)
+        gen_label_file_path = base_dir + "pretrain_data_new/topicBased_generation/TBG_data_label_{}topic.csv".format(topic_num)            
+        assert True == (os.path.exists(test_file_path))
+        assert True== (os.path.exists(train_file_path))
+        assert True ==(os.path.exists(mlm_masked_file_path))
+        assert True== (os.path.exists(mlm_raw_file_path))
+        assert True== (os.path.exists(clf_file_path))
+        assert True== (os.path.exists(gen_inp_file_path))
+        assert True== (os.path.exists(gen_label_file_path))
+        #print (test_file_path,"NOT EXIST\n")
+
+        #self.train_X, self.train_seq_length, self.train_Y, self.test_X, self.test_seq_length, self.test_Y ,self.pre_train1_X, self.pre_train1_seq_length, self.pre_train1_Y,self.pre_train2_X, self.pre_train2_seq_length, self.pre_train2_Y,self.pre_train3_X, self.pre_train3_seq_length, self.pre_train3_Y = self.prepro.load_data("./low_resource_AG_DATA/train100.csv", "./low_resource_AG_DATA/test.csv", self.max_sent_len,pre_train1_filename="./low_resource_AG_DATA/TC_data_5topic.csv")
+        (self.train_X, self.train_seq_length, self.train_Y, 
+                self.test_X, self.test_seq_length, self.test_Y ,
+                self.pre_train1_X, self.pre_train1_seq_length, self.pre_train1_Y,
+                self.pre_train2_X, self.pre_train2_seq_length, self.pre_train2_Y,
+                self.pre_train3_X, self.pre_train3_seq_length, self.pre_train3_Y) = self.prepro.load_data(
+                        train_file_path,test_file_path, self.max_sent_len,pre_train1_filename=clf_file_path)
+        #self.mlm_X ,self.mlm_Y, self.mlm_seq_length = self.prepro.load_mlm_data("./low_resource_AG_DATA/maskedLM/MLM_data_mask_5topic.csv","./low_resource_AG_DATA/maskedLM/MLM_data_raw_5topic.csv",self.max_sent_len)
+        self.mlm_X ,self.mlm_Y, self.mlm_seq_length = self.prepro.load_mlm_data(mlm_masked_file_path,mlm_raw_file_path,self.max_sent_len)
         self.word_embedding, self.char_embedding = self.prepro.prepare_embedding(self.char_dim)
         print("word_embedding",self.word_embedding)
         self.train_X, self.train_X_char, self.train_X_char_len, self.train_Y = self.prepro.prepare_data(self.train_X, self.train_Y, "train")
@@ -90,7 +120,7 @@ class Model:
         train_seq_length = self.pre_train1_seq_length
         train(self, batch_size, training_epochs, char_mode)
     """
-    def pre_train1(self, batch_size, training_epochs, char_mode,loss,mlm_loss,optimizer,logits,learning_rate,pre_train1_Step,train_Step):
+    def pre_train1(self,model_path,model_name, batch_size, training_epochs, char_mode,loss,mlm_loss,optimizer,logits,learning_rate,pre_train1_Step,train_Step):
         self.batch_size = batch_size
         """
         loss, optimizer, logits= self.build_model(self.word_input, self.char_input, self.label, self.seq_len, 
@@ -106,8 +136,10 @@ class Model:
         num_test_batch = int(len(self.test_X) / self.batch_size)
         print("Start training!")
         
-        modelpath = "./tmp_model_transformer_ag_news_{}/".format(char_mode)
-        modelName = "tmp_model_transformer_ag_news_{}.ckpt".format(char_mode)
+        #modelpath = "./tmp_model_transformer_ag_news_{}/".format(char_mode)
+        #modelName = "tmp_model_transformer_ag_news_{}.ckpt".format(char_mode)
+        modelpath=model_path 
+        modelName =model_name
         saver = tf.train.Saver()
         
         train_acc_list = []
@@ -259,7 +291,7 @@ class Model:
             print ('save_path',save_path)
 
         
-    def train(self, batch_size, training_epochs, char_mode, loss, optimizer, logits,learning_rate,pre_train1_Step,train_Step):
+    def train(self, model_path,model_name,batch_size, training_epochs, char_mode, loss, optimizer, logits,learning_rate,pre_train1_Step,train_Step):
         self.batch_size = batch_size
         #build_model se the number of classes!!
         """
@@ -275,8 +307,12 @@ class Model:
         num_test_batch = int(len(self.test_X) / self.batch_size)
         print("Start training!")
         
-        modelpath = "./tmp_model_transformer_ag_news_{}/".format(char_mode)
-        modelName = "tmp_model_transformer_ag_news_{}.ckpt".format(char_mode)
+        #modelpath = "./tmp_model_transformer_ag_news_{0}_{1}/".format(char_mode,describe)
+        #modelName = "tmp_model_transformer_ag_news_{0}_{1}.ckpt".format(char_mode,describe)
+        #modelpath = "./tmp_model_transformer_IMDB_{0}_{1}/".format(char_mode,describe)
+        #modelName = "tmp_model_transformer_IMDB_{0}_{1}.ckpt".format(char_mode,describe)
+        modelpath= model_path 
+        modelName = model_name 
         saver = tf.train.Saver()
         
  

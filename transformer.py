@@ -48,25 +48,32 @@ class Encoder:
             #fllowing loss is same as shown in 4 lines below, but the following way no need to exxcute firstly.            
             mlm_loss = tf.cond(tf.equal(tf.constant(1.0),model_type),lambda:self.get_masked_lm_output( mlm_all_words_logits, word_embedding, mlm_mask_positions,mlm_mask_words, mlm_mask_weights)[0],
                     lambda:tf.constant(1.0))
+            #3 lambda means 1:Loss of both classification and MLM tasks
+            #               2:MLM_Only_loss
+            #               3.classification Loss Only
             loss=tf.cond(tf.equal(tf.constant(1.0),model_type),
                     lambda:tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = logits , labels = labels))+
                         self.get_masked_lm_output( mlm_all_words_logits, word_embedding, mlm_mask_positions,mlm_mask_words, mlm_mask_weights)[0],
+                    #lambda:self.get_masked_lm_output( mlm_all_words_logits, word_embedding, mlm_mask_positions,mlm_mask_words, mlm_mask_weights)[0],
+                    #lambda:tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = logits , labels = labels)),
                         lambda:tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = logits , labels = labels)))
             return loss,mlm_loss
     def build(self, encoder_inputs, mlm_encoder_inputs,seq_len ,labels,word_embedding, mlm_mask_positions, mlm_mask_words,mlm_mask_weights,model_type):
         def Tensor2Layer( tensor):
-             return tensor
-        o1 = tf.identity(encoder_inputs)
-        mlm_o1 = tf.identity(mlm_encoder_inputs) 
-        for i in range(1, self.num_layers+1):
-            with tf.variable_scope("classifier_layer-{}".format(i)):
-                o2 = self._add_and_norm(o1, self._self_attention(q=o1,
-                                                                 k=o1,
-                                                                 v=o1,
-                                                                 seq_len=seq_len), num=1)
-                o3 = self._add_and_norm(o2, self._positional_feed_forward(o2), num=2)
-                o1 = tf.identity(o3)
-
+             return tensor  
+        def transformer(self,input_of_encoder):
+            o1 = tf.identity(input_of_encoder)
+            #mlm_o1 = tf.identity(mlm_encoder_inputs) 
+            for i in range(1, self.num_layers+1):
+                with tf.variable_scope("classifier_layer-{}".format(i)):
+                    o2 = self._add_and_norm(o1, self._self_attention(q=o1,
+                                                                     k=o1,
+                                                                     v=o1,
+                                                                     seq_len=seq_len), num=1)
+                    o3 = self._add_and_norm(o2, self._positional_feed_forward(o2), num=2)
+                    o1 = tf.identity(o3)
+            return o1,o2,o3
+        """
         for j in range(1, self.num_layers+1):
             with tf.variable_scope("mlm_layer-{}".format(j)):
                 mlm_o2 = self._add_and_norm(mlm_o1, self._self_attention(q=mlm_o1,
@@ -75,26 +82,29 @@ class Encoder:
                                                                  seq_len=seq_len), num=1)
                 mlm_o3 = self._add_and_norm(mlm_o2, self._positional_feed_forward(mlm_o2), num=2)
                 mlm_o1 = tf.identity(mlm_o3)
+        """
         #o1-o2-o3 here is [64,100,64]
         #[batch_size,seq_length,hidden_size]
         #o3 is the representation of the whole sents ,adn the following pooling layer 
         #has the shape [64,4] 4 is the number of heads!
-        print("OOOOOOO3",o3,"00000001",o1,"000000002",o2)
+        clf_o1,clf_o2,clf_o3=transformer(self,encoder_inputs)
+        mlm_o1,mlm_o2,mlm_o3=transformer(self,mlm_encoder_inputs)
+        print("OOOOOOO3",clf_o3,"00000001",clf_o1,"000000002",clf_o2)
         print("OOOOOOO3",mlm_o3,"00000001",mlm_o1,"000000002",mlm_o2)
-        all_words_logits = o1
-        mlm_all_words_logits = mlm_o1
+        all_words_logits = clf_o1
+        mlm_all_words_logits = mlm_o1 
         def dense_layer(num,layer):
             #return lambda:Dense(num)(layer)
             return Dense(num)(layer)
          
         with tf.variable_scope("GlobalAveragePooling-layer"):
-            o3 = self._pooling_layer(q=o1, k=o1, v=o1, seq_len =seq_len)
+            clf_pool_o3 = self._pooling_layer(q=clf_o1, k=clf_o1, v=clf_o1, seq_len =seq_len)
             #o3 = Lambda(Tensor2Layer)(o3)
-            print("OOOOOOO3",o3,"00000001",o1,"000000002",o2)
+            #print("OOOOOOO3",o3,"00000001",o1,"000000002",o2)
             #logits=tf.cond(tf.equal(tf.constant(1.0),model_type),lambda: Dense(self.pre_n_class)(o3),lambda: Dense(self.n_class)(o3))#self.n_class)#.item()
             #logits=tf.cond(tf.equal(tf.constant(1.0),model_type),lambda: dense_layer(self.pre_n_class,o3),lambda: dense_layer(self.n_class,o3))#self.n_class)#.item()
-            a = dense_layer(self.pre_n_class,o3)
-            b = dense_layer(self.n_class,o3)
+            a = dense_layer(self.pre_n_class,clf_pool_o3)
+            b = dense_layer(self.n_class,clf_pool_o3)
             print('aa',a,'bb',b)
             #logits=K.switch(tf.equal(tf.constant(1.0),model_type), a,b)#dense_layer(self.pre_n_class,o3), dense_layer(self.n_class,o3))
             logits = tf.cond(tf.equal(tf.constant(1.0),model_type),lambda:a,lambda:b)
@@ -106,7 +116,7 @@ class Encoder:
             else:
                 units_number=self.n_class
             """
-            print('\n\nunits_number:',logits)
+            print('\n\nunits_number:',logits)#the prediction probs of each classes
             #logits= tf.layers.dense(inputs=o3, units=units_number.item(), activation=None) 
             loss,mlm_loss = self.to_get_loss(logits,mlm_all_words_logits,labels,word_embedding,mlm_mask_positions,mlm_mask_words,mlm_mask_weights,model_type)
             #loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = logits , labels = labels)) # Softmax loss
