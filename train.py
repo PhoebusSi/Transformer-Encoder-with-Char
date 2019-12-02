@@ -24,8 +24,8 @@ if __name__ == '__main__':
     flags.DEFINE_integer('max_char_len', 16, 'max length of characters of words')
     flags.DEFINE_float('train_learning_rate', 0.0001, 'initial learning rate')
     flags.DEFINE_float('pre_train_learning_rate', 0.0005, 'initial learning rate')
-    flags.DEFINE_integer('num_train_steps', 300, 'number of training steps for learning rate decay')
-    flags.DEFINE_integer('num_pre_train1_steps', 1000, 'number of training steps for learning rate decay')
+    flags.DEFINE_integer('num_train_steps', 600, 'number of training steps for learning rate decay')
+    flags.DEFINE_integer('num_pre_train1_steps', 4000, 'number of training steps for learning rate decay')
     flags.DEFINE_integer('batch_size', 64, 'number of batch size')
     #flags.DEFINE_integer('pre_batch_size', 64, 'number of batch size')
     flags.DEFINE_integer('training_epochs', 12, 'number of training epochs')
@@ -51,8 +51,8 @@ if __name__ == '__main__':
     print('========================')
     #modelpath = "./tmp_model_transformer_ag_news_{0}_{1}/".format(char_mode,describe)
     #modelName = "tmp_model_transformer_ag_news_{0}_{1}.ckpt".format(char_mode,describe)
-    modelpath = "./tmp_model_transformer_IMDB_{0}_{1}_{2}_{3}_{4}_{5}/".format(FLAGS.char_mode,FLAGS.pre_train_learning_rate,FLAGS.train_learning_rate,FLAGS.pre_training1_epochs,FLAGS.training_epochs,FLAGS.describe)
-    modelName = "tmp_model_transformer_IMDB_{0}_{1}_{2}_{3}_{4}_{5}.ckpt".format(FLAGS.char_mode,FLAGS.pre_train_learning_rate,FLAGS.train_learning_rate,FLAGS.pre_training1_epochs,FLAGS.training_epochs,FLAGS.describe)
+    modelpath = "./tmp_model_transformer_{6}_{0}_{1}_{2}_{3}_{4}_{5}/".format(FLAGS.char_mode,FLAGS.pre_train_learning_rate,FLAGS.train_learning_rate,FLAGS.pre_training1_epochs,FLAGS.training_epochs,FLAGS.describe,FLAGS.data_type)
+    modelName = "tmp_model_transformer_{6}_{0}_{1}_{2}_{3}_{4}_{5}.ckpt".format(FLAGS.char_mode,FLAGS.pre_train_learning_rate,FLAGS.train_learning_rate,FLAGS.pre_training1_epochs,FLAGS.training_epochs,FLAGS.describe,FLAGS.data_type)
     ## Build model
     t_model = model.Model(FLAGS.data_type,FLAGS.labeled_data_num,FLAGS.topic_num,FLAGS.word_dim, FLAGS.char_dim, FLAGS.max_sent_len, FLAGS.max_char_len, 
                            FLAGS.pre_train_learning_rate, FLAGS.train_learning_rate,FLAGS.num_pre_train1_steps,FLAGS.num_train_steps,FLAGS.max_mask_words_per_sent,FLAGS.hidden_act)

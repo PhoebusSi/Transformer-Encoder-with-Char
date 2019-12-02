@@ -192,7 +192,8 @@ class Model:
                     if(step == 0):
                         mode = "init"
                     else:
-                        mode = None
+                        mode = None 
+                    print ("\nwhether init_MODE?",mode)
                     """
                     pre_train1_batch, pre_train1_batch_char, pre_train1_batch_char_len, pre_train1_batch_Y, pre_train1_batch_seq_len = get_batch(self.pre_train1_X, 
                                                                                                                                                  self.pre_train1_X_char, 
@@ -207,7 +208,7 @@ class Model:
                             self.pre_train1_Y, self.pre_train1_seq_length, batch_size,
                             self.mlm_X, self.mlm_X_char,self.mlm_X_char_len,
                             self.mlm_shuffle_positions,self.mlm_shuffle_words,self.mlm_shuffle_weights,self.mlm_seq_length,
-                            mode = None)
+                            mode = mode)
                     print("train_batch",train_batch.shape,train_batch)
                     #print("pre_train1",self.pre_train1_X.shape,self.pre_train1_X)
                     """
@@ -244,8 +245,8 @@ class Model:
                 
                 test_acc, test_loss = 0. , 0.
                 print("Now for test data\nCould take few minutes")
-                for step in range(num_test_batch):
-                    if(step == 0):
+                for step_test in range(num_test_batch):
+                    if(step_test == 0):
                         mode = "init"
                     else:
                         mode = None
@@ -389,8 +390,8 @@ class Model:
                 
                 test_acc, test_loss = 0. , 0.
                 print("Now for test data\nCould take few minutes")
-                for step in range(num_test_batch):
-                    if(step == 0):
+                for step_test in range(num_test_batch):
+                    if(step_test == 0):
                         mode = "init"
                     else:
                         mode = None
@@ -696,10 +697,11 @@ step = 0
 def get_mlm_batch(train_X, train_X_char, train_X_char_len, train_Y, seq_length, batch_size,
         mlm_X, mlm_X_char,mlm_X_char_len,mlm_mask_positions,mlm_mask_words,mlm_mask_weights,mlm_seq_length, mode = None):
     global step
+    #print("\nthe length of train_data",len(train_X))
     if(mode =="init"):
         step = 0
     #print("train_batch_X",train_X.shape,train_X)
-    #print("step",step)
+    print("step",step*batch_size,(step+1)*batch_size)
     #print("batch_size",batch_size,step*batch_size,(step+1)*batch_size)
     train_batch_X = train_X[step*batch_size : (step+1)*batch_size]
     train_batch_X_char = train_X_char[step*batch_size : (step+1)*batch_size]
@@ -717,6 +719,7 @@ def get_mlm_batch(train_X, train_X_char, train_X_char_len, train_Y, seq_length, 
     step += 1
     return train_batch_X, train_batch_X_char, train_batch_X_char_len, train_batch_Y, train_batch_X_seq_len ,mlm_batch_X,mlm_batch_X_char,mlm_batch_X_char_len,mlm_batch_X_seq_len,mlm_batch_mask_positions,mlm_batch_mask_words,mlm_batch_mask_weights
 def get_batch(train_X, train_X_char, train_X_char_len, train_Y, seq_length, batch_size, mode = None):
+    #print("\nthe length of train_data",len(train_X))
     global step
     if(mode =="init"):
         step = 0
