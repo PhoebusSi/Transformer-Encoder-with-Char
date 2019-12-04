@@ -146,19 +146,19 @@ class Preprocess():
         self.get_char_embedding(char_dim, len(self.char_list)) ## Get char embedding
         return self.word_embedding, self.char_embedding
         
-    def prepare_data(self, input_X, input_Y, mode):
+    def prepare_data(self, input_X, input_Y,data_type, mode):
         ## Data -> index
         print("aaaaaaaaaa",len(input_X))
         input_X_index , _,_ = self.convert2index(input_X, "UNK")
         print("aaaaaaaaaa_index",len(input_X_index))
-        input_X_char, input_X_char_len = self.sent2char(input_X, mode)
+        input_X_char, input_X_char_len = self.sent2char(input_X,data_type, mode)
         input_X_index = np.array(input_X_index)
         input_Y = np.array(input_Y)
         return input_X_index, input_X_char, input_X_char_len, input_Y 
 
-    def prepare_mlm_data_Y(self, input_mlm_Y, max_mask_len_per_sent,mask_positions, mode):
+    def prepare_mlm_data_Y(self, input_mlm_Y, max_mask_len_per_sent,mask_positions,data_type, mode):
         input_mlm_Y_index , _ , _  = self.convert2index(input_mlm_Y,"UNK")
-        input_mlm_Y_char,input_mlm_Y_char_len = self.sent2char(input_mlm_Y , mode)
+        input_mlm_Y_char,input_mlm_Y_char_len = self.sent2char(input_mlm_Y ,data_type, mode)
         input_mlm_Y_index = np.array(input_mlm_Y_index)
         sents_masked_ids=[]
         for index_,sent in enumerate(input_mlm_Y_index):
@@ -173,9 +173,9 @@ class Preprocess():
             #print("masked_ids",masked_ids)
         print("input_MLM_Y" ,len(input_mlm_Y),len(input_mlm_Y_index))
         return input_mlm_Y_index, input_mlm_Y_char, input_mlm_Y_char_len, sents_masked_ids
-    def prepare_gen_data_Y(self, input_gen_Y, mode):
+    def prepare_gen_data_Y(self, input_gen_Y, data_type, mode):
         input_gen_Y_index , _ ,_= self.convert2index(input_gen_Y,"UNK")
-        input_gen_Y_char,input_gen_Y_char_len = self.sent2char(input_gen_Y , mode)
+        input_gen_Y_char,input_gen_Y_char_len = self.sent2char(input_gen_Y ,data_type, mode)
         input_gen_Y_index = np.array(input_gen_Y_index)
         sents_masked_ids=[]
         """
@@ -198,9 +198,9 @@ class Preprocess():
 
 
 
-    def prepare_mlm_data_X(self, input_mlm_X, max_mask_len_per_sent, mode):
+    def prepare_mlm_data_X(self, input_mlm_X, max_mask_len_per_sent,data_type, mode):
         input_mlm_X_index , mask_positions ,_ = self.convert2index(input_mlm_X,"UNK")
-        input_mlm_X_char,input_mlm_X_char_len = self.sent2char(input_mlm_X , mode)
+        input_mlm_X_char,input_mlm_X_char_len = self.sent2char(input_mlm_X ,data_type, mode)
         input_mlm_X_index = np.array(input_mlm_X_index)
         pad_mask_positions=[]
         pad_mask_weights = []
@@ -227,10 +227,10 @@ class Preprocess():
             #print("tmmmmp",len(tmp),max_mask_len_per_sent)
             assert len(tmp) == max_mask_len_per_sent 
         return input_mlm_X_index , input_mlm_X_char, input_mlm_X_char_len , pad_mask_positions , pad_mask_weights
-    def prepare_gen_data_X(self, input_gen_X, max_len,mode):
+    def prepare_gen_data_X(self, input_gen_X, max_len,data_type,mode):
         #the data input has been the same right shape/max_sent_len
         input_gen_X_index , _ , gen_X_sos = self.convert2index(input_gen_X,"UNK")
-        input_gen_X_char,input_gen_X_char_len = self.sent2char(input_gen_X , mode)
+        input_gen_X_char,input_gen_X_char_len = self.sent2char(input_gen_X ,data_type, mode)
         input_gen_X_index = np.array(input_gen_X_index)
         pad_positions=[]
         pad_weights = []
@@ -354,10 +354,10 @@ class Preprocess():
         self.char_dict = {char:index for index, char in enumerate(self.char_list)}
 
 
-    def sent2char(self, inputs, train = "train"): ## inputs : [batch_size, max_sent_len]
+    def sent2char(self, inputs,data_type, train = "train"): ## inputs : [batch_size, max_sent_len]
         
-        if os.path.exists("./sent2char_{}.pkl".format(train)):
-            with open("./sent2char_{}.pkl".format(train), 'rb') as f:
+        if os.path.exists("./output_{0}/sent2char_{1}.pkl".format(data_type,train)):
+            with open("./output_{0}/sent2char_{1}.pkl".format(data_type,train), 'rb') as f:
                 outputs,char_len = pickle.load(f)
         else:
             char_len, outputs = [], [] 
@@ -378,7 +378,7 @@ class Preprocess():
             outputs = np.array(outputs)
             char_len = np.array(char_len)
             results = (outputs,char_len)
-            with open("./sent2char_{}.pkl".format(train), 'wb') as f:
+            with open("./output_{0}/sent2char_{1}.pkl".format(data_type,train), 'wb') as f:
                 pickle.dump(results , f)
             
         return outputs,char_len

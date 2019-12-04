@@ -44,7 +44,7 @@ if __name__ == '__main__':
     #flags.DEFINE_integer('pre_train1_n_class', 5, 'number of pre_train1_output class')
     flags.DEFINE_bool('bool_pre_train1', True, 'whether undergoing pre_train1')
     flags.DEFINE_string('char_mode', 'no_char', 'mode of character embedding')
-    flags.DEFINE_string('describe', 'normal_setting?better_have_a_check_of_the_Sparameters', 'the information used to distinguish the model_file')
+    flags.DEFINE_string('describe', 'remember_write_the_epoch_of_pretrain_normal_setting?better_have_a_check_of_the_Sparameters', 'the information used to distinguish the model_file')
     flags.DEFINE_string('hidden_act', 'gelu', 'mode of the activation of Encoder')
     if FLAGS.data_type == "ag":
         n_class = 4 
@@ -73,8 +73,8 @@ if __name__ == '__main__':
     print('========================')
     #modelpath = "./tmp_model_transformer_ag_news_{0}_{1}/".format(char_mode,describe)
     #modelName = "tmp_model_transformer_ag_news_{0}_{1}.ckpt".format(char_mode,describe)
-    modelpath = "./tmp_model_transformer_{6}_{0}_{1}_{2}_{3}_{4}_{5}/".format(FLAGS.char_mode,FLAGS.pre_train_learning_rate,FLAGS.train_learning_rate,FLAGS.pre_training1_epochs,FLAGS.training_epochs,FLAGS.describe,FLAGS.data_type)
-    modelName = "tmp_model_transformer_{6}_{0}_{1}_{2}_{3}_{4}_{5}.ckpt".format(FLAGS.char_mode,FLAGS.pre_train_learning_rate,FLAGS.train_learning_rate,FLAGS.pre_training1_epochs,FLAGS.training_epochs,FLAGS.describe,FLAGS.data_type)
+    modelpath = "./output_{6}/model_transformer_{6}_{0}_{1}_{2}_{4}_{5}/".format(FLAGS.char_mode,FLAGS.pre_train_learning_rate,FLAGS.train_learning_rate,FLAGS.pre_training1_epochs,FLAGS.training_epochs,FLAGS.describe,FLAGS.data_type)
+    modelName = "model_transformer_{6}_{0}_{1}_{2}_{4}_{5}.ckpt".format(FLAGS.char_mode,FLAGS.pre_train_learning_rate,FLAGS.train_learning_rate,FLAGS.pre_training1_epochs,FLAGS.training_epochs,FLAGS.describe,FLAGS.data_type)
     ## Build model
     t_model = model.Model(FLAGS.data_type,FLAGS.labeled_data_num,FLAGS.topic_num,FLAGS.word_dim, FLAGS.char_dim, FLAGS.max_sent_len, FLAGS.max_char_len, 
                            FLAGS.pre_train_learning_rate, FLAGS.train_learning_rate,num_pre_train1_steps,num_train_steps,FLAGS.max_mask_words_per_sent,FLAGS.hidden_act)
