@@ -20,7 +20,8 @@ if __name__ == '__main__':
     flags.DEFINE_integer('topic_num', 5, 'number of topics')
     flags.DEFINE_integer('word_dim', 64, 'dimension of word vector')
     flags.DEFINE_integer('char_dim', 15, 'dimension of character vector')
-    flags.DEFINE_integer('max_sent_len', 100, 'max length of words of sentences')
+    # the max_length_of_each_sents is depending on the data_type 
+    #flags.DEFINE_integer('max_sent_len', 100, 'max length of words of sentences')
     flags.DEFINE_integer('max_char_len', 16, 'max length of characters of words')
     flags.DEFINE_float('train_learning_rate', 0.00015, 'initial learning rate')
     flags.DEFINE_float('pre_train_learning_rate', 0.0003, 'initial learning rate')
@@ -39,7 +40,9 @@ if __name__ == '__main__':
     flags.DEFINE_integer('ffn_dim', 64*2, 'dimension of feed forward network')
     #n_class has been replaced bydata_type;data_type determind the classes number!
     #flags.DEFINE_integer('n_class', 4, 'number of output class')
-    flags.DEFINE_integer('max_mask_words_per_sent', 20, 'the max number f mask per sentence')
+
+    # the max number of each sent is depending on the max length of the sents
+    #flags.DEFINE_integer('max_mask_words_per_sent', 20, 'the max number f mask per sentence')
     #pre_train1_n_class been repaced by topic_num 
     #flags.DEFINE_integer('pre_train1_n_class', 5, 'number of pre_train1_output class')
     flags.DEFINE_bool('bool_pre_train1', True, 'whether undergoing pre_train1')
@@ -51,6 +54,9 @@ if __name__ == '__main__':
         print ("DATA_AG has 4 classes data!")
         num_pre_train1_steps = FLAGS.pre_training1_epochs * (120000//FLAGS.batch_size+1)+1
         num_train_steps = FLAGS.training_epochs * (FLAGS.labeled_data_num//FLAGS.batch_size+1)+1
+        max_sent_len = 80 
+        #average sent_length of ag is 50
+        max_mask_words_per_sent = max_sent_len//5
         print("after",num_pre_train1_steps,"the learning_rate of pre_training decrease to 0")
         print("after",num_train_steps,"the learning_rate of training decrease to 0")
     elif FLAGS.data_type == "imdb":
@@ -58,6 +64,9 @@ if __name__ == '__main__':
         print ("DATA_AG has 2 classes data!")
         num_pre_train1_steps = FLAGS.pre_training1_epochs * (25000//FLAGS.batch_size+1)+1
         num_train_steps = FLAGS.training_epochs * (FLAGS.labeled_data_num//FLAGS.batch_size+1)+1
+        max_sent_len = 400
+        #average sent_length of imdb is 300
+        max_mask_words_per_sent = max_sent_len//5
         print("after",num_pre_train1_steps,"the learning_rate of pre_training decrease to 0")
         print("after",num_train_steps,"the learning_rate of training decrease to 0")
     elif FLAGS.data_type == "intent":
@@ -65,6 +74,9 @@ if __name__ == '__main__':
         print ("DATA_AG has 7 classes data!")
         num_pre_train1_steps = FLAGS.pre_training1_epochs * (11040//FLAGS.batch_size+1)+1
         num_train_steps = FLAGS.training_epochs * (FLAGS.labeled_data_num//FLAGS.batch_size+1)+1
+        max_sent_len = 20 
+        #average sent_length of intent is 13
+        max_mask_words_per_sent = max_sent_len//5
         print("after",num_pre_train1_steps,"the learning_rate of pre_training decrease to 0")
         print("after",num_train_steps,"the learning_rate of training decrease to 0")
     print('========================')
@@ -76,8 +88,8 @@ if __name__ == '__main__':
     modelpath = "./output_{6}/model_transformer_{6}_{0}_{1}_{2}_{4}_{5}/".format(FLAGS.char_mode,FLAGS.pre_train_learning_rate,FLAGS.train_learning_rate,FLAGS.pre_training1_epochs,FLAGS.training_epochs,FLAGS.describe,FLAGS.data_type)
     modelName = "model_transformer_{6}_{0}_{1}_{2}_{4}_{5}.ckpt".format(FLAGS.char_mode,FLAGS.pre_train_learning_rate,FLAGS.train_learning_rate,FLAGS.pre_training1_epochs,FLAGS.training_epochs,FLAGS.describe,FLAGS.data_type)
     ## Build model
-    t_model = model.Model(FLAGS.data_type,FLAGS.labeled_data_num,FLAGS.topic_num,FLAGS.word_dim, FLAGS.char_dim, FLAGS.max_sent_len, FLAGS.max_char_len, 
-                           FLAGS.pre_train_learning_rate, FLAGS.train_learning_rate,num_pre_train1_steps,num_train_steps,FLAGS.max_mask_words_per_sent,FLAGS.hidden_act)
+    t_model = model.Model(FLAGS.data_type,FLAGS.labeled_data_num,FLAGS.topic_num,FLAGS.word_dim, FLAGS.char_dim, max_sent_len, FLAGS.max_char_len, 
+                           FLAGS.pre_train_learning_rate, FLAGS.train_learning_rate,num_pre_train1_steps,num_train_steps,max_mask_words_per_sent,FLAGS.hidden_act)
     
     
     t_model.build_parameter(FLAGS.num_layers, FLAGS.num_heads, FLAGS.linear_key_dim, FLAGS.linear_value_dim,
