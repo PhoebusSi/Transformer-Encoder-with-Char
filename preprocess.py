@@ -238,7 +238,7 @@ class Preprocess():
             #print("mask_postions",j)
             tmp=[]
             tmp2 = []
-            for index,i in range(j):
+            for index,i in enumerate(j):
                 #the word whose id==0 this word is <PAD>
                 if i==0:
                     tmp.append(0)
@@ -309,6 +309,7 @@ class Preprocess():
         for sent in doc:
             sub = []
             pos = []
+            sos = 0
             for ind,word in enumerate(sent):
                 #if unk == "UK":
                 #    print("word",word)
@@ -316,7 +317,7 @@ class Preprocess():
                     #cuz ind can not  be 0, 0 is padding number,so ind start from 1?
                     #Nope, it starts from 0, because it is index of list and the weights decides the pad!
                     pos.append(ind)
-                if word = "SOS":
+                if word == "SOS":
                     sos = ind 
                 if(word in self.vocabulary):
                     index = self.vocabulary[word]
