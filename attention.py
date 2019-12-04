@@ -113,16 +113,20 @@ class Attention:
             row_vector = tf.range(0,o2.shape[2],1)  ## [, max_seq_len]
             #[0,1,2,3,4,5,max_len-1]
             matrix = tf.cast(tf.expand_dims(seq_len,-1), tf.int32) ## [batch_size, 1]
+            print("matrix",matrix)
             t = tf.cast(row_vector < matrix, tf.float32) ##  [batch_size, max_seq_len]
             # b=tf.linalg.band_part(a,b.get_shape()[1].value-1,0)) 
             # if the length < max_length,add 1;else,add 0. make the value where is out the seq_len be 0!
             t = tf.expand_dims(t, -1) ##  [batch_size, max_seq_len, 1]
+            print ("t",t)
             masks = t * tf.transpose(t, [0,2,1]) ##  [batch_size, max_seq_len, max_seq_len]
 
 
             matrix_sos = tf.cast(tf.expand_dims(sos,-1),tf.int32) ##[batch_size,1]
+            print("matrix_sos",matrix_sos)
             t_sos = tf.cast(row_vector < matrix_sos,tf.float32 )##[batch_size,max_seq_len]
-            t_sos = tf.expand_dims(t,-1) ##[batch_size,max_seq_len,1]
+            t_sos = tf.expand_dims(t_sos,-1) ##[batch_size,max_seq_len,1]
+            print("t_sos",t_sos )
             sos_masks = t_sos * tf.transpose(t_sos,[0,2,1])##[batch_size,max_seq_len,max_seq_len]
 
             #masks:
@@ -158,7 +162,7 @@ class Attention:
             1 1 1 0 
             0 0 0 0 no_future_matrix
             """
-            final_masks = tf.cond(tf.equal(future,tf.consttant(1.0)),lambda:no_future_masks,lambda:masks)
+            final_masks = tf.cond(tf.equal(future,tf.constant(1.0)),lambda:no_future_masks,lambda:masks)
             masks = tf.tile(tf.expand_dims(final_masks, 1), [1, int(o2.shape[1]), 1, 1]) ##  [batch_size, num_heads, max_seq_len, max_seq_len]
 
             paddings = tf.ones_like(masks) * -1e9

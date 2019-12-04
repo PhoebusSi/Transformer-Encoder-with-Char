@@ -319,6 +319,7 @@ class Preprocess():
                     pos.append(ind)
                 if word == "SOS":
                     sos = ind 
+                    gen_sos.append(sos)
                 if(word in self.vocabulary):
                     index = self.vocabulary[word]
                     sub.append(index)
@@ -329,7 +330,6 @@ class Preprocess():
                         sub.append(unk_index)   
             word_index.append(sub) 
             mask_positions.append(pos)
-            gen_sos.append(sos)
         return word_index,mask_positions,gen_sos 
 
     def get_char_list(self,tokens):

@@ -54,14 +54,15 @@ class Encoder:
             #               2:MLM_Only_loss
             #               3.classification Loss Only
             loss=tf.cond(tf.equal(tf.constant(1.0),model_type),
-                    #lambda:tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = logits , labels = labels))+
-                    #    self.get_masked_lm_output( mlm_all_words_logits, word_embedding, mlm_mask_positions,mlm_mask_words, mlm_mask_weights)[0],
-                    lambda:self.get_masked_lm_output( gen_all_words_logits, word_embedding, gen_pad_positions,gen_pad_words, gen_pad_weights)[0],
+                    lambda:tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = logits , labels = labels))+
+                        self.get_masked_lm_output( mlm_all_words_logits, word_embedding, mlm_mask_positions,mlm_mask_words, mlm_mask_weights)[0] +
+                        self.get_masked_lm_output( gen_all_words_logits, word_embedding, gen_pad_positions,gen_pad_words, gen_pad_weights)[0],
+                    #lambda:self.get_masked_lm_output( gen_all_words_logits, word_embedding, gen_pad_positions,gen_pad_words, gen_pad_weights)[0],
                     #lambda:self.get_masked_lm_output( mlm_all_words_logits, word_embedding, mlm_mask_positions,mlm_mask_words, mlm_mask_weights)[0],
                     #lambda:tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = logits , labels = labels)),
                         lambda:tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = logits , labels = labels)))
-            return loss,mlm_loss
-    def build(self, encoder_inputs, mlm_encoder_inputs, gen_encoder_emb,seq_len ,labels,word_embedding, mlm_mask_positions, mlm_mask_words,mlm_mask_weights,gen_pad_positions,gen_pad_words,gen_pad_weights,gen_pad_sos,model_type):
+            return loss,mlm_loss,gen_loss
+    def build(self, encoder_inputs, mlm_encoder_inputs, gen_encoder_inputs,seq_len ,labels,word_embedding, mlm_mask_positions, mlm_mask_words,mlm_mask_weights,gen_pad_positions,gen_pad_words,gen_pad_weights,gen_pad_sos,model_type):
         def Tensor2Layer( tensor):
              return tensor  
         def transformer(self,input_of_encoder,future,sos,seq_len):
@@ -92,8 +93,8 @@ class Encoder:
         #[batch_size,seq_length,hidden_size]
         #o3 is the representation of the whole sents ,adn the following pooling layer 
         #has the shape [64,4] 4 is the number of heads!
-        g1=tf.contant(0.0)
-        g2=tf.contant(1.0)
+        g1=tf.constant(0.0)
+        g2=tf.constant(1.0)
         clf_o1,clf_o2,clf_o3=transformer(self,encoder_inputs,g1,gen_pad_sos,seq_len) 
         mlm_o1,mlm_o2,mlm_o3=transformer(self,mlm_encoder_inputs,g1,gen_pad_sos,seq_len)
         gen_o1,gen_o2,gen_o3=transformer(self,gen_encoder_inputs,g2,gen_pad_sos,seq_len)
@@ -128,9 +129,9 @@ class Encoder:
             """
             print('\n\nunits_number:',logits)#the prediction probs of each classes
             #logits= tf.layers.dense(inputs=o3, units=units_number.item(), activation=None) 
-            loss,mlm_loss = self.to_get_loss(logits,mlm_all_words_logits,gen_all_words_logits,labels,word_embedding,mlm_mask_positions,mlm_mask_words,mlm_mask_weights,gen_pad_positions,gen_pad_words,gen_pad_weights,model_type)
+            loss,mlm_loss ,gen_loss= self.to_get_loss(logits,mlm_all_words_logits,gen_all_words_logits,labels,word_embedding,mlm_mask_positions,mlm_mask_words,mlm_mask_weights,gen_pad_positions,gen_pad_words,gen_pad_weights,model_type)
             #loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = logits , labels = labels)) # Softmax loss
-        return loss,logits,mlm_loss
+        return loss,logits,mlm_loss,gen_loss
         #loss is loss; logits is predictions in classification task ;
         #mlm_loss is the loss for  the mlm task , return it to show whether it getting stability
         #o3 is the outputs of transformer(logits)
