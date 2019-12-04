@@ -38,7 +38,7 @@ class Model:
         if data_type == 'ag':
             base_dir = 'data/AG/'
         elif data_type == 'imdb':
-            base_dir = 'data/IMBD/'
+            base_dir = 'data/IMDB/'
         elif data_type == 'intent':
             base_dir = 'data/Intent/'
         test_file_path = base_dir+"test.csv"
@@ -47,14 +47,14 @@ class Model:
         mlm_raw_file_path = base_dir + "pretrain_data_new/maskedLM/MLM_data_raw_{}topic.csv".format(topic_num)
         clf_file_path = base_dir + "pretrain_data_new/topic_calssification/TC_data_{}topic.csv".format(topic_num)
         gen_inp_file_path = base_dir + "pretrain_data_new/topicBased_generation/TBG_data_input_{}topic.csv".format(topic_num)
-        gen_label_file_path = base_dir + "pretrain_data_new/topicBased_generation/TBG_data_label_{}topic.csv".format(topic_num)            
+        gen_out_file_path = base_dir + "pretrain_data_new/topicBased_generation/TBG_data_label_{}topic.csv".format(topic_num)            
         assert True == (os.path.exists(test_file_path))
         assert True== (os.path.exists(train_file_path))
         assert True ==(os.path.exists(mlm_masked_file_path))
         assert True== (os.path.exists(mlm_raw_file_path))
         assert True== (os.path.exists(clf_file_path))
         assert True== (os.path.exists(gen_inp_file_path))
-        assert True== (os.path.exists(gen_label_file_path))
+        assert True== (os.path.exists(gen_out_file_path))
         #print (test_file_path,"NOT EXIST\n")
 
         #self.train_X, self.train_seq_length, self.train_Y, self.test_X, self.test_seq_length, self.test_Y ,self.pre_train1_X, self.pre_train1_seq_length, self.pre_train1_Y,self.pre_train2_X, self.pre_train2_seq_length, self.pre_train2_Y,self.pre_train3_X, self.pre_train3_seq_length, self.pre_train3_Y = self.prepro.load_data("./low_resource_AG_DATA/train100.csv", "./low_resource_AG_DATA/test.csv", self.max_sent_len,pre_train1_filename="./low_resource_AG_DATA/TC_data_5topic.csv")
@@ -66,6 +66,7 @@ class Model:
                         train_file_path,test_file_path, self.max_sent_len,pre_train1_filename=clf_file_path)
         #self.mlm_X ,self.mlm_Y, self.mlm_seq_length = self.prepro.load_mlm_data("./low_resource_AG_DATA/maskedLM/MLM_data_mask_5topic.csv","./low_resource_AG_DATA/maskedLM/MLM_data_raw_5topic.csv",self.max_sent_len)
         self.mlm_X ,self.mlm_Y, self.mlm_seq_length = self.prepro.load_mlm_data(mlm_masked_file_path,mlm_raw_file_path,self.max_sent_len)
+        self.gen_X ,self.gen_Y, self.gen_seq_length = self.prepro.load_mlm_data(gen_inp_file_path,gen_out_file_path,self.max_sent_len)
         self.word_embedding, self.char_embedding = self.prepro.prepare_embedding(self.char_dim)
         print("word_embedding",self.word_embedding)
         self.train_X, self.train_X_char, self.train_X_char_len, self.train_Y = self.prepro.prepare_data(self.train_X, self.train_Y, "train")
@@ -74,6 +75,9 @@ class Model:
         self.mlm_Y, self.mlm_Y_char, self.mlm_Y_char_len, self.mlm_words = self.prepro.prepare_mlm_data_Y(self.mlm_Y, self.max_mask_words_per_sent,self.mlm_positions,"mlm_pretrain_Y")
         self.mlm_positons,self.mlm_words,self.mlm_weights = self.prepro.mlm_fix_mask(self.max_mask_words_per_sent,self.mlm_positions,self.mlm_words,self.mlm_weights)
         
+        self.gen_X, self.gen_X_char, self.gen_X_char_len, self.gen_positions,self.gen_weights ,self.gen_X_sos= self.prepro.prepare_gen_data_X(self.gen_X, self.max_sent_len, "gen_pretrain_X")
+        self.gen_Y, self.gen_Y_char, self.gen_Y_char_len  = self.prepro.prepare_gen_data_Y(self.gen_Y ,"gen_pretrain_Y")
+        self.gen_words = self.gen_Y
         #print("xxx?",self.pre_train1_seq_length)
         if len(self.pre_train1_seq_length):
                 self.pre_train1_X, self.pre_train1_X_char, self.pre_train1_X_char_len, self.pre_train1_Y = self.prepro.prepare_data(self.pre_train1_X, self.pre_train1_Y, "pre_train1")
@@ -85,19 +89,26 @@ class Model:
         ## Placeholders
         self.word_input = tf.placeholder(tf.int32, shape = [None, max_sent_len], name = 'word')
         self.mlm_word_input = tf.placeholder(tf.int32, shape = [None, max_sent_len], name = 'mlm_word')
+        self.gen_word_input = tf.placeholder(tf.int32, shape = [None, max_sent_len], name = 'gen_word')
         self.char_input = tf.placeholder(tf.int32, shape = [None, max_sent_len, max_char_len], name = 'char')
         self.mlm_char_input = tf.placeholder(tf.float32, shape = [None, max_sent_len, max_char_len], name = 'mlm_X_char')
+        self.gen_char_input = tf.placeholder(tf.float32, shape = [None, max_sent_len, max_char_len], name = 'gen_X_char')
         self.label = tf.placeholder(tf.int32, shape = [None], name = 'label')
         self.seq_len = tf.placeholder(tf.int32, shape = [None])
         self.mlm_seq_len = tf.placeholder(tf.int32, shape = [None])
+        self.gen_seq_len = tf.placeholder(tf.int32, shape = [None])
         self.char_len = tf.placeholder(tf.int32, [None, max_sent_len])
         self.mlm_char_len = tf.placeholder(tf.int32, [None, max_sent_len])
+        self.gen_char_len = tf.placeholder(tf.int32, [None, max_sent_len])
         self.dropout = tf.placeholder(tf.float32, shape = ())
         self.model_type = tf.placeholder(tf.float32, shape = ()) 
         self.mlm_mask_positions = tf.placeholder(tf.int32,shape = [None, self.max_mask_words_per_sent],name = 'mask_pos') 
         self.mlm_mask_words = tf.placeholder(tf.int32,shape = [None, self.max_mask_words_per_sent],name = 'mask_ids') 
         self.mlm_mask_weights = tf.placeholder(tf.float32,shape = [None, self.max_mask_words_per_sent],name = 'mask_weights') 
-        
+        self.gen_pad_positions = tf.placeholder(tf.int32,shape = [None, self.max_sent_len],name = 'gen_pos') 
+        self.gen_pad_words = tf.placeholder(tf.int32,shape = [None, self.max_sent_len],name = 'gen_ids') 
+        self.gen_pad_weights = tf.placeholder(tf.float32,shape = [None, self.max_sent_len],name = 'gen_weights') 
+        self.gen_pad_sos = tf.placeholder(tf.int32, shape=[None])
         #self.word_input = tf.cast(self.word_input,tf.int32)
         #self.mlm_word_input = tf.cast(self.mlm_word_input,tf.int32)
         #self.mlm_mask_positions = tf.cast(self.mlm_mask_positions,tf.int32)
@@ -139,7 +150,7 @@ class Model:
         #modelpath = "./tmp_model_transformer_ag_news_{}/".format(char_mode)
         #modelName = "tmp_model_transformer_ag_news_{}.ckpt".format(char_mode)
         modelpath=model_path 
-        modelName =model_name
+        modelName =model_name 
         saver = tf.train.Saver()
         
         train_acc_list = []
@@ -170,6 +181,12 @@ class Model:
         
                 train_acc, train_loss,train_mlm_loss = 0., 0., 0.   
                 print ('epocj_max_X_char_len before  VS before pre_train1_X ',self.mlm_X_char_len.shape , self.pre_train1_X.shape, self.pre_train1_X_char.shape)
+                """
+                #combine the 3 pretraining task's shuffle process in one functions to keep a sent is doing 3 tasks at the same time 
+                self.pre_train1_X, self.pre_train1_X_char, self.pre_train1_X_char_len, self.pre_train1_Y = self.shuffle(self.pre_train1_X, 
+                self.mlm_X, self.mlm_X_char, self.mlm_X_char_len, self.mlm_shuffle_positions,self.mlm_shuffle_words,self.mlm_shuffle_weights = self.shuffle_mlm(self.mlm_X,
+                self.gen_X, self.gen_X_char, self.gen_X_char_len, self.gen_shuffle_positions,self.gen_shuffle_words,self.gen_shuffle_weights = self.shuffle_mlm(self.gen_X,
+ 
                 self.pre_train1_X, self.pre_train1_X_char, self.pre_train1_X_char_len, self.pre_train1_Y = self.shuffle(self.pre_train1_X, 
                                                                                                     self.pre_train1_X_char, 
                                                                                                     self.pre_train1_X_char_len, 
@@ -181,6 +198,14 @@ class Model:
                         self.mlm_positions, 
                         self.mlm_words, 
                         self.mlm_weights)
+                self.gen_X, self.gen_X_char, self.gen_X_char_len, self.gen_shuffle_positions,self.gen_shuffle_words,self.gen_shuffle_weights = self.shuffle_mlm(self.gen_X,
+                        self.gen_X_char, 
+                        self.gen_X_char_len, 
+                        self.gen_positions, 
+                        self.gen_words, 
+                        self.gen_weights,
+                        self.gen_X_sos) 
+                """
                 """
                 self.train_X, self.train_X_char, self.train_X_char_len, self.train_Y = self.shuffle(self.pre_train1_X, 
                                                                                                     self.pre_train1_X_char, 
@@ -203,11 +228,17 @@ class Model:
                                                                                                                                                  self.batch_size,
                                                                                                                                                  mode)           
                     """
-                    train_batch,train_batch_char,train_batch_char_len,train_batch_Y,train_batch_seq_len,mlm_batch_X,mlm_batch_X_char,mlm_batch_X_char_len, mlm_batch_X_seq_len,mlm_batch_mask_positions,mlm_batch_mask_words,mlm_batch_mask_weights = get_mlm_batch(
+                    ( train_batch,train_batch_char,train_batch_char_len,train_batch_Y,train_batch_seq_len,
+                            mlm_batch_X,mlm_batch_X_char,mlm_batch_X_char_len, mlm_batch_X_seq_len,
+                            mlm_batch_mask_positions,mlm_batch_mask_words,mlm_batch_mask_weights ,
+                            gen_batch_X,gen_batch_X_char,gen_batch_X_char_len, gen_batch_X_seq_len,
+                            gen_batch_pad_positions,gen_batch_pad_words,gen_batch_pad_weights) = get_mlm_batch(
                             self.pre_train1_X, self.pre_train1_X_char, self.pre_train1_X_char_len, 
                             self.pre_train1_Y, self.pre_train1_seq_length, batch_size,
                             self.mlm_X, self.mlm_X_char,self.mlm_X_char_len,
                             self.mlm_shuffle_positions,self.mlm_shuffle_words,self.mlm_shuffle_weights,self.mlm_seq_length,
+                            self.gen_X, self.gen_X_char,self.gen_X_char_len,
+                            self.gen_shuffle_positions,self.gen_shuffle_words,self.gen_shuffle_weights,self.gen_seq_length,
                             mode = mode)
                     print("train_batch",train_batch.shape,train_batch)
                     #print("pre_train1",self.pre_train1_X.shape,self.pre_train1_X)
@@ -482,7 +513,7 @@ class Model:
         input_ = tf.expand_dims(input_, 1) # input_: [batch_size*max_sent_len, 1, max_word_len, char_embed_size]
         
         layers = []
-        with tf.variable_scope(scope):
+        with tf.variable_scope(scope,reuse=tf.AUTO_REUSE):
             for kernel_size, kernel_feature_size in zip(kernels, kernel_features):
                 reduced_length = max_word_len - kernel_size + 1
     
@@ -507,7 +538,7 @@ class Model:
         return output
     
     def conv2d(self, input_, output_dim, k_h, k_w, name="conv2d"):
-        with tf.variable_scope(name):
+        with tf.variable_scope(name,reuse=tf.AUTO_REUSE):
             w = tf.get_variable('w', [k_h, k_w, input_.get_shape()[-1], output_dim])
             b = tf.get_variable('b', [output_dim])
     
@@ -520,7 +551,7 @@ class Model:
         z = t * g(Wy + b) + (1 - t) * y
         where g is nonlinearity, t is transform gate, and (1 - t) is carry gate.
         """   
-        with tf.variable_scope(scope):
+        with tf.variable_scope(scope,reuse=tf.AUTO_REUSE):
             for idx in range(num_layers):
                 g = tf.nn.relu(tf.layers.dense(input_, size, name='highway_lin_%d' % idx))
     
@@ -640,13 +671,13 @@ class Model:
                
         
         if(char_mode == "char_cnn"):
-            char_inputs = tf.nn.embedding_lookup(self.char_embedding, char_inputs)
+            char_inputs = tf.nn.embedding_lookup(self.char_embedding, tf.cast(char_inputs,tf.int32))
             kernels = [ 1,   2,   3,   4,   5,   6]
             kernel_features = [25, 50, 75, 100, 125, 150]
             char_inputs = self.char_cnn(char_inputs, kernels, kernel_features, scope='char_cnn')
             final_outputs = tf.concat([encoded_inputs,char_inputs], axis=2)
         elif(char_mode == "char_lstm"):
-            char_inputs = tf.nn.embedding_lookup(self.char_embedding, char_inputs)
+            char_inputs = tf.nn.embedding_lookup(self.char_embedding, tf.cast(char_inputs,tf.int32))
             char_inputs = self.char_lstm(char_inputs, char_len, self.word_dim, self.dropout, last=True, scope="char_lstm")      
             final_outputs = tf.concat([encoded_inputs,char_inputs], axis=2)
         elif(char_mode == "no_char"):
@@ -670,7 +701,7 @@ class Model:
         print("normal_shuffle_",train_X_char_len.shape)
         train_Y = train_Y[mask]
         return train_X, train_X_char, train_X_char_len, train_Y
-    def shuffle_mlm(self, mlm_X, mlm_X_char, mlm_X_char_len, mlm_positions, mlm_words, mlm_weights):
+    def shuffle_mlm(self, mlm_X, mlm_X_char, mlm_X_char_len, mlm_positions, mlm_words, mlm_weights , gen_sos=0):
         mask = np.random.permutation(len(mlm_X))
         print("mask",len(mask),mask)
         mlm_X = mlm_X[mask]
@@ -686,8 +717,14 @@ class Model:
         mlm_positions = mlm_positions[mask]
         mlm_words = mlm_words[mask]
         mlm_weights = mlm_weights[mask]
-        return mlm_X, mlm_X_char, mlm_X_char_len, mlm_positions, mlm_words, mlm_weights
-    
+        if gen_sos:
+            return mlm_X, mlm_X_char, mlm_X_char_len, mlm_positions, mlm_words, mlm_weights
+        else:
+            gen_sos = gen_sos[mask]
+            return mlm_X, mlm_X_char, mlm_X_char_len, mlm_positions, mlm_words, mlm_weights, gen_sos
+
+            
+
     def load_char_embedding(self, filename):
         print("Char embedding loaded!")
         self.char_embedding = np.load(filename)
@@ -695,7 +732,9 @@ class Model:
 
 step = 0
 def get_mlm_batch(train_X, train_X_char, train_X_char_len, train_Y, seq_length, batch_size,
-        mlm_X, mlm_X_char,mlm_X_char_len,mlm_mask_positions,mlm_mask_words,mlm_mask_weights,mlm_seq_length, mode = None):
+        mlm_X, mlm_X_char,mlm_X_char_len,mlm_mask_positions,mlm_mask_words,mlm_mask_weights,mlm_seq_length, 
+        gen_X, gen_X_char, gen_X_char_len,gen_pad_positions,gen_pad_words,gen_pad_weights,gen_seq_length,
+        mode = None):
     global step
     #print("\nthe length of train_data",len(train_X))
     if(mode =="init"):
@@ -714,10 +753,20 @@ def get_mlm_batch(train_X, train_X_char, train_X_char_len, train_Y, seq_length, 
     mlm_batch_mask_positions = mlm_mask_positions[step*batch_size : (step+1)*batch_size]
     mlm_batch_mask_words = mlm_mask_words[step*batch_size : (step+1)*batch_size]
     mlm_batch_mask_weights = mlm_mask_weights[step*batch_size : (step+1)*batch_size]
+
+    gen_batch_X = gen_X[step*batch_size : (step+1)*batch_size]
+    gen_batch_X_char = gen_X_char[step*batch_size : (step+1)*batch_size]
+    gen_batch_X_char_len = gen_X_char_len[step*batch_size : (step+1)*batch_size]
+
+    gen_batch_pad_positions = gen_pad_positions[step*batch_size : (step+1)*batch_size]
+    gen_batch_pad_words = gen_pad_words[step*batch_size : (step+1)*batch_size]
+    gen_batch_pad_weights = gen_pad_weights[step*batch_size : (step+1)*batch_size]
+
     train_batch_X_seq_len = seq_length[step*batch_size : (step+1)*batch_size]
     mlm_batch_X_seq_len = mlm_seq_length[step*batch_size : (step+1)*batch_size]
+    gen_batch_X_seq_len = gen_seq_length[step*batch_size : (step+1)*batch_size]
     step += 1
-    return train_batch_X, train_batch_X_char, train_batch_X_char_len, train_batch_Y, train_batch_X_seq_len ,mlm_batch_X,mlm_batch_X_char,mlm_batch_X_char_len,mlm_batch_X_seq_len,mlm_batch_mask_positions,mlm_batch_mask_words,mlm_batch_mask_weights
+    return train_batch_X, train_batch_X_char, train_batch_X_char_len, train_batch_Y, train_batch_X_seq_len ,mlm_batch_X,mlm_batch_X_char,mlm_batch_X_char_len,mlm_batch_X_seq_len,mlm_batch_mask_positions,mlm_batch_mask_words,mlm_batch_mask_weights,gen_batch_X,gen_batch_X_char,gen_batch_X_char_len,gen_batch_X_seq_len,gen_batch_pad_positions,gen_batch_pad_words,gen_batch_pad_weights
 def get_batch(train_X, train_X_char, train_X_char_len, train_Y, seq_length, batch_size, mode = None):
     #print("\nthe length of train_data",len(train_X))
     global step

@@ -42,7 +42,7 @@ class Encoder:
         print("\ntransformer_outputs_Class_Number",self.pre_n_class,self.n_class)
     def to_get_loss(self, logits,mlm_all_words_logits,labels,word_embedding,mlm_mask_positions,mlm_mask_words,mlm_mask_weights,model_type):
             #loss_1 = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = logits , labels = labels)) # Softmax loss
-            #loss_mlm ,_,_=   self.get_masked_lm_output( mlm_all_words_logits, word_embedding, mlm_mask_positions,mlm_mask_words, mlm_mask_weights)
+            #loss_mlm ,_,_=   self.get_masked_lm_output( mlm_all_words_logits, word_embedding,mlm_mask_positions,mlm_mask_words, mlm_mask_weights)
             #loss_pre = loss_1 +loss_mlm
             #loss=tf.cond(tf.equal(tf.constant(1.0),model_type),lambda:loss_pre,lambda:loss_1)
             #fllowing loss is same as shown in 4 lines below, but the following way no need to exxcute firstly.            
@@ -52,10 +52,10 @@ class Encoder:
             #               2:MLM_Only_loss
             #               3.classification Loss Only
             loss=tf.cond(tf.equal(tf.constant(1.0),model_type),
-                    lambda:tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = logits , labels = labels))+
-                        self.get_masked_lm_output( mlm_all_words_logits, word_embedding, mlm_mask_positions,mlm_mask_words, mlm_mask_weights)[0],
+                    #lambda:tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = logits , labels = labels))+
+                    #    self.get_masked_lm_output( mlm_all_words_logits, word_embedding, mlm_mask_positions,mlm_mask_words, mlm_mask_weights)[0],
                     #lambda:self.get_masked_lm_output( mlm_all_words_logits, word_embedding, mlm_mask_positions,mlm_mask_words, mlm_mask_weights)[0],
-                    #lambda:tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = logits , labels = labels)),
+                    lambda:tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = logits , labels = labels)),
                         lambda:tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = logits , labels = labels)))
             return loss,mlm_loss
     def build(self, encoder_inputs, mlm_encoder_inputs,seq_len ,labels,word_embedding, mlm_mask_positions, mlm_mask_words,mlm_mask_weights,model_type):
@@ -65,7 +65,7 @@ class Encoder:
             o1 = tf.identity(input_of_encoder)
             #mlm_o1 = tf.identity(mlm_encoder_inputs) 
             for i in range(1, self.num_layers+1):
-                with tf.variable_scope("classifier_layer-{}".format(i)):
+                with tf.variable_scope("transformer_layer-{}".format(i)):
                     o2 = self._add_and_norm(o1, self._self_attention(q=o1,
                                                                      k=o1,
                                                                      v=o1,
@@ -157,7 +157,7 @@ class Encoder:
                       w2_dim=self.model_dim,
                       dropout=self.dropout)
             return ffn.dense_gelu_dense(output)
-    def get_masked_lm_output(self, input_tensor, output_weights, positions,
+    def get_masked_lm_output(self, input_tensor,output_weights, positions,
         label_ids, label_weights):
         #to get masked Lm loss and log prob""      
         # only need the msked Token's output
@@ -167,12 +167,15 @@ class Encoder:
             with tf.variable_scope("transform"):
                 input_tensor = tf.layers.dense(
                         input_tensor,
-                        units=self.model_dim,
+                        #units=self.model_dim,
+                        units = 64,#limit the model_dim has to be the dim of the words_embedding
                         activation=self.get_activation(self.hidden_act),
                         kernel_initializer=self.create_initializer(0.02))
                 input_tensor = self.layer_norm(input_tensor)
                 # output_weights reuse the input's word Embedding so it comes from canshu
                 # oone more bias
+                
+                #input_tensor =tf.cond( input_tensor.get_shape()[1].value==output_weights.get_shape()[1].value,lambda:input_tensor,lambda:tf.dense_layer(input_tensor,units=output_weights.get_shape()[1].value)) 
                 output_bias = tf.get_variable(
                         "output_bias",
                         shape=[self.vocab_size],

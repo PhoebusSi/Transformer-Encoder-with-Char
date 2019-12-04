@@ -142,14 +142,14 @@ class Preprocess():
     def prepare_embedding(self, char_dim):
         #self.get_word_embedding() ## Get pretrained word embedding        
         tokens = self.train_X + self.test_X        
-        self.get_char_list(tokens)  ## build char dict 
+        self.get_char_list(tokens)  ## build char dict
         self.get_char_embedding(char_dim, len(self.char_list)) ## Get char embedding
         return self.word_embedding, self.char_embedding
         
     def prepare_data(self, input_X, input_Y, mode):
         ## Data -> index
         print("aaaaaaaaaa",len(input_X))
-        input_X_index , _= self.convert2index(input_X, "UNK")
+        input_X_index , _,_ = self.convert2index(input_X, "UNK")
         print("aaaaaaaaaa_index",len(input_X_index))
         input_X_char, input_X_char_len = self.sent2char(input_X, mode)
         input_X_index = np.array(input_X_index)
@@ -157,15 +157,15 @@ class Preprocess():
         return input_X_index, input_X_char, input_X_char_len, input_Y 
 
     def prepare_mlm_data_Y(self, input_mlm_Y, max_mask_len_per_sent,mask_positions, mode):
-        input_mlm_Y_index , _ = self.convert2index(input_mlm_Y,"UNK")
+        input_mlm_Y_index , _ , _  = self.convert2index(input_mlm_Y,"UNK")
         input_mlm_Y_char,input_mlm_Y_char_len = self.sent2char(input_mlm_Y , mode)
         input_mlm_Y_index = np.array(input_mlm_Y_index)
         sents_masked_ids=[]
         for index_,sent in enumerate(input_mlm_Y_index):
             #print("index",index_)
             masked_ids=[]
-            for i in mask_positions[index_]:
-                if i==0:
+            for len_sub_1 ,i in enumerate( mask_positions[index_]):
+                if i==0 and len_sub_1 >0:
                     masked_ids.append(0)
                 else:
                     masked_ids.append(sent[i])
@@ -173,12 +173,33 @@ class Preprocess():
             #print("masked_ids",masked_ids)
         print("input_MLM_Y" ,len(input_mlm_Y),len(input_mlm_Y_index))
         return input_mlm_Y_index, input_mlm_Y_char, input_mlm_Y_char_len, sents_masked_ids
+    def prepare_gen_data_Y(self, input_gen_Y, mode):
+        input_gen_Y_index , _ ,_= self.convert2index(input_gen_Y,"UNK")
+        input_gen_Y_char,input_gen_Y_char_len = self.sent2char(input_gen_Y , mode)
+        input_gen_Y_index = np.array(input_gen_Y_index)
+        sents_masked_ids=[]
+        """
+        for index_,sent in enumerate(input_gen_Y_index):
+            #print("index",index_)
+            pad_ids=[]
+            for len_sub_1 ,i in enumerate( pad_positions[index_]):
+                #if i==0:
+                if len_sub_1 > gen_Y_len - 1:
+                    masked_ids.append(0)
+                else:
+                    masked_ids.append(sent[i])
+            sents_masked_ids.append(masked_ids)
+            #print("masked_ids",masked_ids)
+        """
+        #the input_gen_Y_index actually is the real_word_id of each sentence(predict whloe sentence)!
+        print("input_GEN_Y" ,len(input_gen_Y),len(input_gen_Y_index))
+        return input_gen_Y_index, input_gen_Y_char, input_gen_Y_char_len 
 
 
 
 
     def prepare_mlm_data_X(self, input_mlm_X, max_mask_len_per_sent, mode):
-        input_mlm_X_index , mask_positions = self.convert2index(input_mlm_X,"UNK")
+        input_mlm_X_index , mask_positions ,_ = self.convert2index(input_mlm_X,"UNK")
         input_mlm_X_char,input_mlm_X_char_len = self.sent2char(input_mlm_X , mode)
         input_mlm_X_index = np.array(input_mlm_X_index)
         pad_mask_positions=[]
@@ -206,6 +227,34 @@ class Preprocess():
             #print("tmmmmp",len(tmp),max_mask_len_per_sent)
             assert len(tmp) == max_mask_len_per_sent 
         return input_mlm_X_index , input_mlm_X_char, input_mlm_X_char_len , pad_mask_positions , pad_mask_weights
+    def prepare_gen_data_X(self, input_gen_X, max_len,mode):
+        #the data input has been the same right shape/max_sent_len
+        input_gen_X_index , _ , gen_X_sos = self.convert2index(input_gen_X,"UNK")
+        input_gen_X_char,input_gen_X_char_len = self.sent2char(input_gen_X , mode)
+        input_gen_X_index = np.array(input_gen_X_index)
+        pad_positions=[]
+        pad_weights = []
+        for j in input_gen_X_index:
+            #print("mask_postions",j)
+            tmp=[]
+            tmp2 = []
+            for index,i in range(j):
+                #the word whose id==0 this word is <PAD>
+                if i==0:
+                    tmp.append(0)
+                    tmp2.append(0) 
+                else:
+                    tmp.append(index)
+                    tmp2.append(1)
+
+            pad_positions.append(tmp)
+            pad_weights.append(tmp2)
+            #print (len(tmp), max_mask_len_per_sent,"are we equal?")
+            #print ("pad_mask_positions",tmp,"pad_mask_weights",tmp2)
+            #print("tmmmmp",len(tmp),max_mask_len_per_sent)
+            assert len(tmp) == max_len 
+        return input_gen_X_index , input_gen_X_char, input_gen_X_char_len , pad_positions , pad_weights ,gen_X_sos 
+
     def mlm_fix_mask(self, max_mask_len_per_sent,mlm_mask_positons, mlm_mask_words, mlm_mask_weights):
         new_mlm_mask_postions=[]
         new_mlm_mask_words=[]
@@ -256,6 +305,7 @@ class Preprocess():
     def convert2index(self, doc, unk = "UNK"):
         word_index = []
         mask_positions = []
+        gen_sos = []
         for sent in doc:
             sub = []
             pos = []
@@ -263,7 +313,11 @@ class Preprocess():
                 #if unk == "UK":
                 #    print("word",word)
                 if word == "MASK":
+                    #cuz ind can not  be 0, 0 is padding number,so ind start from 1?
+                    #Nope, it starts from 0, because it is index of list and the weights decides the pad!
                     pos.append(ind)
+                if word = "SOS":
+                    sos = ind 
                 if(word in self.vocabulary):
                     index = self.vocabulary[word]
                     sub.append(index)
@@ -274,7 +328,8 @@ class Preprocess():
                         sub.append(unk_index)   
             word_index.append(sub) 
             mask_positions.append(pos)
-        return word_index,mask_positions 
+            gen_sos.append(sos)
+        return word_index,mask_positions,gen_sos 
 
     def get_char_list(self,tokens):
         if os.path.exists("./char_list.csv"):
@@ -305,7 +360,7 @@ class Preprocess():
             with open("./sent2char_{}.pkl".format(train), 'rb') as f:
                 outputs,char_len = pickle.load(f)
         else:
-            char_len, outputs = [], []
+            char_len, outputs = [], [] 
             for sent in inputs:
                 sub_char_len, sub_outputs = [], []
                 for word in sent:

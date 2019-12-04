@@ -22,14 +22,14 @@ if __name__ == '__main__':
     flags.DEFINE_integer('char_dim', 15, 'dimension of character vector')
     flags.DEFINE_integer('max_sent_len', 100, 'max length of words of sentences')
     flags.DEFINE_integer('max_char_len', 16, 'max length of characters of words')
-    flags.DEFINE_float('train_learning_rate', 0.0001, 'initial learning rate')
-    flags.DEFINE_float('pre_train_learning_rate', 0.0005, 'initial learning rate')
-    flags.DEFINE_integer('num_train_steps', 600, 'number of training steps for learning rate decay')
-    flags.DEFINE_integer('num_pre_train1_steps', 4000, 'number of training steps for learning rate decay')
+    flags.DEFINE_float('train_learning_rate', 0.00015, 'initial learning rate')
+    flags.DEFINE_float('pre_train_learning_rate', 0.0003, 'initial learning rate')
+    #flags.DEFINE_integer('num_train_steps', 600, 'number of training steps for learning rate decay')
+    flags.DEFINE_integer('pre_training1_epochs', 1, 'number of training epochs')
+    #flags.DEFINE_integer('num_pre_train1_steps', 1900, 'number of training steps for learning rate decay')
     flags.DEFINE_integer('batch_size', 64, 'number of batch size')
     #flags.DEFINE_integer('pre_batch_size', 64, 'number of batch size')
-    flags.DEFINE_integer('training_epochs', 12, 'number of training epochs')
-    flags.DEFINE_integer('pre_training1_epochs', 12, 'number of training epochs')
+    flags.DEFINE_integer('training_epochs', 80, 'number of training epochs')
     ## Transformer-Encoder parameter
     flags.DEFINE_integer('num_layers', 7, 'number of layers of transformer encoders')
     flags.DEFINE_integer('num_heads', 4, 'number of heads of transformer encoders')
@@ -37,14 +37,36 @@ if __name__ == '__main__':
     flags.DEFINE_integer('linear_value_dim', 4*32, 'dimension of')
     flags.DEFINE_integer('model_dim', 64*2, 'output dimension of transformer encoder')
     flags.DEFINE_integer('ffn_dim', 64*2, 'dimension of feed forward network')
-    flags.DEFINE_integer('n_class', 4, 'number of output class')
+    #n_class has been replaced bydata_type;data_type determind the classes number!
+    #flags.DEFINE_integer('n_class', 4, 'number of output class')
     flags.DEFINE_integer('max_mask_words_per_sent', 20, 'the max number f mask per sentence')
-    flags.DEFINE_integer('pre_train1_n_class', 5, 'number of pre_train1_output class')
+    #pre_train1_n_class been repaced by topic_num 
+    #flags.DEFINE_integer('pre_train1_n_class', 5, 'number of pre_train1_output class')
     flags.DEFINE_bool('bool_pre_train1', True, 'whether undergoing pre_train1')
     flags.DEFINE_string('char_mode', 'no_char', 'mode of character embedding')
     flags.DEFINE_string('describe', 'normal_setting?better_have_a_check_of_the_Sparameters', 'the information used to distinguish the model_file')
     flags.DEFINE_string('hidden_act', 'gelu', 'mode of the activation of Encoder')
-    
+    if FLAGS.data_type == "ag":
+        n_class = 4 
+        print ("DATA_AG has 4 classes data!")
+        num_pre_train1_steps = FLAGS.pre_training1_epochs * (120000//FLAGS.batch_size+1)+1
+        num_train_steps = FLAGS.training_epochs * (FLAGS.labeled_data_num//FLAGS.batch_size+1)+1
+        print("after",num_pre_train1_steps,"the learning_rate of pre_training decrease to 0")
+        print("after",num_train_steps,"the learning_rate of training decrease to 0")
+    elif FLAGS.data_type == "imdb":
+        n_class = 2 
+        print ("DATA_AG has 2 classes data!")
+        num_pre_train1_steps = FLAGS.pre_training1_epochs * (25000//FLAGS.batch_size+1)+1
+        num_train_steps = FLAGS.training_epochs * (FLAGS.labeled_data_num//FLAGS.batch_size+1)+1
+        print("after",num_pre_train1_steps,"the learning_rate of pre_training decrease to 0")
+        print("after",num_train_steps,"the learning_rate of training decrease to 0")
+    elif FLAGS.data_type == "intent":
+        n_class = 7 
+        print ("DATA_AG has 7 classes data!")
+        num_pre_train1_steps = FLAGS.pre_training1_epochs * (11040//FLAGS.batch_size+1)+1
+        num_train_steps = FLAGS.training_epochs * (FLAGS.labeled_data_num//FLAGS.batch_size+1)+1
+        print("after",num_pre_train1_steps,"the learning_rate of pre_training decrease to 0")
+        print("after",num_train_steps,"the learning_rate of training decrease to 0")
     print('========================')
     for key in FLAGS.__flags.keys():
         print('{} : {}'.format(key, getattr(FLAGS, key)))
@@ -55,11 +77,11 @@ if __name__ == '__main__':
     modelName = "tmp_model_transformer_{6}_{0}_{1}_{2}_{3}_{4}_{5}.ckpt".format(FLAGS.char_mode,FLAGS.pre_train_learning_rate,FLAGS.train_learning_rate,FLAGS.pre_training1_epochs,FLAGS.training_epochs,FLAGS.describe,FLAGS.data_type)
     ## Build model
     t_model = model.Model(FLAGS.data_type,FLAGS.labeled_data_num,FLAGS.topic_num,FLAGS.word_dim, FLAGS.char_dim, FLAGS.max_sent_len, FLAGS.max_char_len, 
-                           FLAGS.pre_train_learning_rate, FLAGS.train_learning_rate,FLAGS.num_pre_train1_steps,FLAGS.num_train_steps,FLAGS.max_mask_words_per_sent,FLAGS.hidden_act)
+                           FLAGS.pre_train_learning_rate, FLAGS.train_learning_rate,num_pre_train1_steps,num_train_steps,FLAGS.max_mask_words_per_sent,FLAGS.hidden_act)
     
     
     t_model.build_parameter(FLAGS.num_layers, FLAGS.num_heads, FLAGS.linear_key_dim, FLAGS.linear_value_dim,
-                            FLAGS.model_dim, FLAGS.ffn_dim, FLAGS.n_class,FLAGS.pre_train1_n_class,bool_pre_train_1=True)
+                            FLAGS.model_dim, FLAGS.ffn_dim, n_class,FLAGS.topic_num ,bool_pre_train_1=True)
     ## Pre_Train model
     
     t_model.batch_size = FLAGS.batch_size
@@ -84,11 +106,11 @@ if __name__ == '__main__':
     # Training parameter
     """
     t_model.build_parameter(FLAGS.num_layers, FLAGS.num_heads, FLAGS.linear_key_dim, FLAGS.linear_value_dim,
-                            FLAGS.model_dim, FLAGS.ffn_dim, FLAGS.n_class, FLAGS.pre_train1_n_class, FLAGS.bool_pre_train1)
+                            FLAGS.model_dim, FLAGS.ffn_dim, n_class, FLAGS.topic_nums, FLAGS.bool_pre_train1)
     ## Train model
     t_model.train(FLAGS.batch_size, FLAGS.training_epochs, FLAGS.char_mode)
     t_model.build_parameter(FLAGS.num_layers, FLAGS.num_heads, FLAGS.linear_key_dim, FLAGS.linear_value_dim,
-                            FLAGS.model_dim, FLAGS.ffn_dim, FLAGS.n_class)
+                            FLAGS.model_dim, FLAGS.ffn_dim, n_class)
     """
  
     #tf.reset_default_graph()
