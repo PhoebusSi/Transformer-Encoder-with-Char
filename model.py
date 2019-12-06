@@ -19,8 +19,9 @@ config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 class Model:
 
-    def __init__(self, data_type, labeled_data_num,topic_num, word_dim, char_dim, max_sent_len, max_char_len, pre_train_learning_rate,train_learning_rate,num_pre_train1_steps, num_train_steps,max_mask_words_per_sent,hidden_act):
+    def __init__(self, data_type,loss_type, labeled_data_num,topic_num, word_dim, char_dim, max_sent_len, max_char_len, pre_train_learning_rate,train_learning_rate,num_pre_train1_steps, num_train_steps,max_mask_words_per_sent,hidden_act):
         self.labeled_data_num = labeled_data_num 
+        self.loss_type = loss_type
         self.topic_num = topic_num
         self.word_dim = word_dim
         self.char_dim = char_dim
@@ -278,7 +279,7 @@ class Model:
                                        self.seq_len: train_batch_seq_len, self.char_len: train_batch_char_len, self.dropout : 0.2, self.model_type:1.0}
                     """
                     feed_dict_train = {self.word_input: train_batch, self.char_input : train_batch_char, self.label: train_batch_Y,
-                                       self.seq_len: train_batch_seq_len, self.char_len: train_batch_char_len, self.dropout : 0.2, self.model_type:1.0,
+                                       self.seq_len: train_batch_seq_len, self.char_len: train_batch_char_len, self.dropout : 0.2, self.model_type:self.loss_type,
                                        self.mlm_word_input: mlm_batch_X, self.mlm_char_input: mlm_batch_X_char, self.mlm_seq_len : mlm_batch_X_seq_len,
                                        self.mlm_char_len: mlm_batch_X_char_len, self.mlm_mask_positions:mlm_batch_mask_positions, self.mlm_mask_words:mlm_batch_mask_words,
                                        self.mlm_mask_weights:mlm_batch_mask_weights,
@@ -314,7 +315,7 @@ class Model:
                                                                                                                    mode) 
                     mlm_batch_positions_for_test,mlm_batch_words_for_test,mlm_batch_weights_for_test,gen_batch_positions_for_test,gen_batch_words_for_test,gen_batch_weights_for_test,gen_batch_sos_for_test=self.get_empty_mlm_specail_batch(self.batch_size,self.max_mask_words_per_sent,self.max_sent_len)
                     feed_dict_test = {self.word_input: test_batch, self.char_input: test_batch_char, self.label: test_batch_Y, 
-                                      self.seq_len: test_batch_seq_len, self.char_len: test_batch_char_len, self.dropout : 0.0,self.model_type:4.0,
+                                      self.seq_len: test_batch_seq_len, self.char_len: test_batch_char_len, self.dropout : 0.0,self.model_type:0.0,
                                       self.mlm_word_input: test_batch, self.mlm_char_input: test_batch_char, self.mlm_seq_len : test_batch_seq_len,
                                       self.mlm_char_len: test_batch_char_len, self.mlm_mask_positions:mlm_batch_positions_for_test, self.mlm_mask_words:mlm_batch_words_for_test,
                                       self.mlm_mask_weights:mlm_batch_weights_for_test,
@@ -435,7 +436,7 @@ class Model:
                     #mlm_batch_positions_for_test,mlm_batch_words_for_test,mlm_batch_weights_for_test=self.get_empty_mlm_specail_batch(self.batch_size,self.max_mask_words_per_sent,self.max_sent_len)
                     mlm_batch_positions_for_test,mlm_batch_words_for_test,mlm_batch_weights_for_test,gen_batch_positions_for_test,gen_batch_words_for_test,gen_batch_weights_for_test,gen_batch_sos_for_test=self.get_empty_mlm_specail_batch(self.batch_size,self.max_mask_words_per_sent,self.max_sent_len)
                     feed_dict_train = {self.word_input: train_batch, self.char_input : train_batch_char, self.label: train_batch_Y,
-                                       self.seq_len: train_batch_seq_len, self.char_len: train_batch_char_len, self.dropout : 0.2,self.model_type:4.0,
+                                       self.seq_len: train_batch_seq_len, self.char_len: train_batch_char_len, self.dropout : 0.2,self.model_type:0.0,
                                        self.mlm_word_input: train_batch, self.mlm_char_input: train_batch_char, self.mlm_seq_len : train_batch_seq_len,
                                        self.mlm_char_len: train_batch_char_len, self.mlm_mask_positions:mlm_batch_positions_for_test, self.mlm_mask_words:mlm_batch_words_for_test,
                                        self.mlm_mask_weights:mlm_batch_weights_for_test,
@@ -443,7 +444,7 @@ class Model:
                                        self.gen_char_len:train_batch_char_len, self.gen_pad_positions:gen_batch_positions_for_test, self.gen_pad_words: gen_batch_words_for_test, 
                                        self.gen_pad_weights:gen_batch_weights_for_test, self.gen_pad_sos : gen_batch_sos_for_test}
                     #feed_dict_train = {self.word_input: train_batch, self.char_input : train_batch_char, self.label: train_batch_Y,
-                    #                  self.seq_len: train_batch_seq_len, self.char_len: train_batch_char_len, self.dropout : 0.2,self.model_type:4.0,
+                    #                  self.seq_len: train_batch_seq_len, self.char_len: train_batch_char_len, self.dropout : 0.2,self.model_type:0.0,
                     #                   self.mlm_word_input: mlm_batch_X, self.mlm_char_input: mlm_batch_X_char, self.mlm_seq_len : mlm_batch_X_seq_len,
                     #                   self.mlm_char_len: mlm_batch_X_char_len, self.mlm_mask_positions:mlm_batch_mask_positions, self.mlm_mask_words:mlm_batch_mask_words,
                     #                   self.mlm_mask_weights:mlm_batch_mask_weights}
@@ -473,7 +474,7 @@ class Model:
                     #mlm_batch_positions_for_test,mlm_batch_words_for_test,mlm_batch_weights_for_test=self.get_empty_mlm_specail_batch(self.batch_size,self.max_mask_words_per_sent)
                     mlm_batch_positions_for_test,mlm_batch_words_for_test,mlm_batch_weights_for_test,gen_batch_positions_for_test,gen_batch_words_for_test,gen_batch_weights_for_test,gen_batch_sos_for_test=self.get_empty_mlm_specail_batch(self.batch_size,self.max_mask_words_per_sent,self.max_sent_len)
                     feed_dict_test = {self.word_input: test_batch, self.char_input: test_batch_char, self.label: test_batch_Y, 
-                                      self.seq_len: test_batch_seq_len, self.char_len: test_batch_char_len, self.dropout : 0.0,self.model_type:4.0,
+                                      self.seq_len: test_batch_seq_len, self.char_len: test_batch_char_len, self.dropout : 0.0,self.model_type:0.0,
                                       self.mlm_word_input: test_batch, self.mlm_char_input: test_batch_char, self.mlm_seq_len : test_batch_seq_len,
                                       self.mlm_char_len: test_batch_char_len, self.mlm_mask_positions:mlm_batch_positions_for_test, self.mlm_mask_words:mlm_batch_words_for_test,
                                       self.mlm_mask_weights:mlm_batch_weights_for_test,
@@ -481,7 +482,7 @@ class Model:
                                       self.gen_char_len: test_batch_char_len, self.gen_pad_positions:gen_batch_positions_for_test, self.gen_pad_words: gen_batch_words_for_test, 
                                       self.gen_pad_weights:gen_batch_weights_for_test, self.gen_pad_sos : gen_batch_sos_for_test}
                     #feed_dict_test = {self.word_input: test_batch, self.char_input: test_batch_char, self.label: test_batch_Y, 
-                    #                  self.seq_len: test_batch_seq_len, self.char_len: test_batch_char_len, self.dropout : 0.0,self.model_type:4.0}
+                    #                  self.seq_len: test_batch_seq_len, self.char_len: test_batch_char_len, self.dropout : 0.0,self.model_type:0.0}
                     # Compute average loss
                     test_batch_loss = sess.run(loss, feed_dict = feed_dict_test)
                     test_loss += test_batch_loss / num_test_batch
@@ -689,11 +690,12 @@ class Model:
             print("gen_loss",gen_loss)
             #loss = encoder_outputs
             #loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits = encoder_outputs , labels = labels)) # Softmax loss
-            optimizer=tf.cond(tf.equal(tf.constant(1.0),model_type),lambda:tf.train.AdamOptimizer(learning_rate=pre_train_learning_rate).minimize(loss, global_step=pre_train1_global_step),#pre_train1_model_dim_train1_global_step) # Adam Optimizer
-                    lambda:tf.train.AdamOptimizer(learning_rate=train_learning_rate).minimize(loss, global_step=train_global_step))#train_global_step) # Adam Optimizer
+            optimizer=tf.cond(tf.equal(tf.constant(0.0),model_type),#lambda:tf.train.AdamOptimizer(learning_rate=pre_train_learning_rate).minimize(loss, global_step=pre_train1_global_step),#pre_train1_model_dim_train1_global_step) # Adam Optimizer
+                    lambda:tf.train.AdamOptimizer(learning_rate=train_learning_rate).minimize(loss, global_step=train_global_step),#train_global_step) # Adam Optimizer
+            lambda:tf.train.AdamOptimizer(learning_rate=pre_train_learning_rate).minimize(loss, global_step=pre_train1_global_step))#pre_train1_model_dim_train1_global_step) # Adam Optimizer
             
-            learning_rate = tf.cond(tf.equal(tf.constant(1.0),model_type),
-                    lambda:pre_train_learning_rate,lambda:train_learning_rate)
+            learning_rate = tf.cond(tf.equal(tf.constant(0.0),model_type),
+                    lambda:train_learning_rate,lambda:pre_train_learning_rate)
             print("\nLEARNING_RATE",learning_rate)
             #learning_rate = tf.constant([learning_rate])
         return loss, mlm_loss, gen_loss,optimizer, encoder_outputs , learning_rate,pre_train1_global_step,train_global_step

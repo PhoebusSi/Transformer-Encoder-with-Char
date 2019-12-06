@@ -4,7 +4,8 @@ Created on Fri May  3 14:27:21 2019
 
 @author: jbk48
 """
-
+import os 
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 import model
 import tensorflow as tf
 config = tf.ConfigProto()
@@ -17,13 +18,14 @@ if __name__ == '__main__':
     ## Model parameter
     flags.DEFINE_string('data_type', 'ag', 'source of data')
     flags.DEFINE_integer('labeled_data_num', 100, 'number of the labeled data in train')
+    flags.DEFINE_integer('loss_type', 7, 'the type of loss in the pre_train')
     flags.DEFINE_integer('topic_num', 5, 'number of topics')
     flags.DEFINE_integer('word_dim', 64, 'dimension of word vector')
     flags.DEFINE_integer('char_dim', 15, 'dimension of character vector')
     # the max_length_of_each_sents is depending on the data_type 
     #flags.DEFINE_integer('max_sent_len', 100, 'max length of words of sentences')
     flags.DEFINE_integer('max_char_len', 16, 'max length of characters of words')
-    flags.DEFINE_float('train_learning_rate', 0.00015, 'initial learning rate')
+    flags.DEFINE_float('train_learning_rate', 0.0002, 'initial learning rate')
     flags.DEFINE_float('pre_train_learning_rate', 0.0003, 'initial learning rate')
     #flags.DEFINE_integer('num_train_steps', 600, 'number of training steps for learning rate decay')
     flags.DEFINE_integer('pre_training1_epochs', 1, 'number of training epochs')
@@ -76,7 +78,7 @@ if __name__ == '__main__':
         n_class = 7 
         print ("DATA_AG has 7 classes data!")
         num_pre_train1_steps = FLAGS.pre_training1_epochs * (11040//FLAGS.batch_size+1)+1
-        training_epochs = 144 
+        training_epochs = 192 
         num_train_steps = training_epochs * (FLAGS.labeled_data_num//FLAGS.batch_size+1)+1
         max_sent_len = 20 
         #average sent_length of intent is 13
@@ -89,10 +91,11 @@ if __name__ == '__main__':
     print('========================')
     #modelpath = "./tmp_model_transformer_ag_news_{0}_{1}/".format(char_mode,describe)
     #modelName = "tmp_model_transformer_ag_news_{0}_{1}.ckpt".format(char_mode,describe)
-    modelpath = "./output_{6}/model_transformer_{6}_{0}_{1}_{2}_{4}_{5}/".format(FLAGS.char_mode,FLAGS.pre_train_learning_rate,FLAGS.train_learning_rate,FLAGS.pre_training1_epochs,training_epochs,FLAGS.describe,FLAGS.data_type)
-    modelName = "model_transformer_{6}_{0}_{1}_{2}_{4}_{5}.ckpt".format(FLAGS.char_mode,FLAGS.pre_train_learning_rate,FLAGS.train_learning_rate,FLAGS.pre_training1_epochs,training_epochs,FLAGS.describe,FLAGS.data_type)
-    ## Build model
-    t_model = model.Model(FLAGS.data_type,FLAGS.labeled_data_num,FLAGS.topic_num,FLAGS.word_dim, FLAGS.char_dim, max_sent_len, FLAGS.max_char_len, 
+    modelpath = "./output_{6}/{7}/model_transformer_{6}_{0}_{1}_{2}_{4}_{5}/".format(FLAGS.char_mode,FLAGS.pre_train_learning_rate,FLAGS.train_learning_rate,FLAGS.pre_training1_epochs,training_epochs,FLAGS.describe,FLAGS.data_type,FLAGS.loss_type)
+    modelName = "model_transformer_{6}_type{7}Loss_{0}_{1}_{2}_{4}_{5}.ckpt".format(FLAGS.char_mode,FLAGS.pre_train_learning_rate,FLAGS.train_learning_rate,FLAGS.pre_training1_epochs,training_epochs,FLAGS.describe,FLAGS.data_type,FLAGS.loss_type)
+    ## Build model 
+    loss_type = float(FLAGS.loss_type)
+    t_model = model.Model(FLAGS.data_type,loss_type,FLAGS.labeled_data_num,FLAGS.topic_num,FLAGS.word_dim, FLAGS.char_dim, max_sent_len, FLAGS.max_char_len, 
                            FLAGS.pre_train_learning_rate, FLAGS.train_learning_rate,num_pre_train1_steps,num_train_steps,max_mask_words_per_sent,FLAGS.hidden_act)
     
     
