@@ -8,8 +8,11 @@ Created on Mon Aug 20 21:13:33 2018
 import pandas as pd
 import numpy as np
 import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "2,3"
 import re
+#import tensorflow.compat.v1 as tf
 import tensorflow as tf
+tf.device('/gpu:2')
 import pickle
 from itertools import chain
 from keras.preprocessing.sequence import pad_sequences
@@ -19,16 +22,16 @@ from sklearn.preprocessing import LabelBinarizer
 
 class Preprocess():
     
-    def __init__(self, char_dim, max_sent_len, max_char_len):
-        self.char_dim = char_dim
+    def __init__(self,  max_sent_len):
+        #self.char_dim = char_dim
         self.max_sent_len = max_sent_len
-        self.max_char_len = max_char_len
+        #self.max_char_len = max_char_len
         self.vocab_size = self.get_word_embedding()
         self.stop = set(stopwords.words('english'))
         self.stop.update(['.', ',', '"', "'", '?', '!', ':', ';', '(', ')', '[', ']', '{', '}', ""])
 
 
-    def load_data(self, train_filename, test_filename, max_len, pre_train1_filename='', pre_train2_filename='', pre_train3_filename=''):
+    def load_data(self, train_filename, test_filename, max_len, pre_train1_filename=''):
         print("Making corpus!\nCould take few minutes!") 
         corpus, labels = self.read_data(train_filename)
         self.train_X, self.train_seq_length, self.train_Y = self.clean_text(corpus, labels)
@@ -43,6 +46,7 @@ class Preprocess():
                 self.pre_train1_seq_length=[]
                 self.pre_train1_Y=[]
         print("yyyy",corpus)
+        """
         if len(pre_train2_filename):
                 corpus, labels = self.read_data(pre_train2_filename)
                 self.pre_train2_X, self.pre_train2_seq_length, self.pre_train2_Y = self.clean_text(corpus, labels)
@@ -58,7 +62,8 @@ class Preprocess():
                 self.pre_train3_X=[]
                 self.pre_train3_seq_length=[]
                 self.pre_train3_Y=[]
-        return self.train_X, self.train_seq_length, self.train_Y, self.test_X, self.test_seq_length, self.test_Y , self.pre_train1_X, self.pre_train1_seq_length, self.pre_train1_Y, self.pre_train2_X, self.pre_train2_seq_length, self.pre_train2_Y, self.pre_train3_X, self.pre_train3_seq_length, self.pre_train3_Y
+        """
+        return self.train_X, self.train_seq_length, self.train_Y, self.test_X, self.test_seq_length, self.test_Y , self.pre_train1_X, self.pre_train1_seq_length, self.pre_train1_Y
     def load_mlm_data(self,mlm_X_filename,mlm_Y_filename,max_len):
         print("Making MLM corpus!\nCould take few minutes!")
         corpus_X = self.read_mlm_data(mlm_X_filename)
@@ -139,26 +144,26 @@ class Preprocess():
         labels = labels[index_list]
         return tokens, seq_len, labels
     
-    def prepare_embedding(self, char_dim):
+    def prepare_embedding(self):
         #self.get_word_embedding() ## Get pretrained word embedding        
         tokens = self.train_X + self.test_X        
-        self.get_char_list(tokens)  ## build char dict
-        self.get_char_embedding(char_dim, len(self.char_list)) ## Get char embedding
-        return self.word_embedding, self.char_embedding
+        #self.get_char_list(tokens)  ## build char dict
+        #self.get_char_embedding(char_dim, len(self.char_list)) ## Get char embedding
+        return self.word_embedding
         
     def prepare_data(self, input_X, input_Y,data_type, mode):
         ## Data -> index
         print("aaaaaaaaaa",len(input_X))
         input_X_index , _,_ = self.convert2index(input_X, "UNK")
         print("aaaaaaaaaa_index",len(input_X_index))
-        input_X_char, input_X_char_len = self.sent2char(input_X,data_type, mode)
+        #input_X_char, input_X_char_len = self.sent2char(input_X,data_type, mode)
         input_X_index = np.array(input_X_index)
         input_Y = np.array(input_Y)
-        return input_X_index, input_X_char, input_X_char_len, input_Y 
+        return input_X_index ,input_Y 
 
     def prepare_mlm_data_Y(self, input_mlm_Y, max_mask_len_per_sent,mask_positions,data_type, mode):
         input_mlm_Y_index , _ , _  = self.convert2index(input_mlm_Y,"UNK")
-        input_mlm_Y_char,input_mlm_Y_char_len = self.sent2char(input_mlm_Y ,data_type, mode)
+        #input_mlm_Y_char,input_mlm_Y_char_len = self.sent2char(input_mlm_Y ,data_type, mode)
         input_mlm_Y_index = np.array(input_mlm_Y_index)
         sents_masked_ids=[]
         for index_,sent in enumerate(input_mlm_Y_index):
@@ -172,10 +177,10 @@ class Preprocess():
             sents_masked_ids.append(masked_ids)
             #print("masked_ids",masked_ids)
         print("input_MLM_Y" ,len(input_mlm_Y),len(input_mlm_Y_index))
-        return input_mlm_Y_index, input_mlm_Y_char, input_mlm_Y_char_len, sents_masked_ids
+        return input_mlm_Y_index, sents_masked_ids
     def prepare_gen_data_Y(self, input_gen_Y, data_type, mode):
         input_gen_Y_index , _ ,_= self.convert2index(input_gen_Y,"UNK")
-        input_gen_Y_char,input_gen_Y_char_len = self.sent2char(input_gen_Y ,data_type, mode)
+        #input_gen_Y_char,input_gen_Y_char_len = self.sent2char(input_gen_Y ,data_type, mode)
         input_gen_Y_index = np.array(input_gen_Y_index)
         sents_masked_ids=[]
         """
@@ -193,14 +198,14 @@ class Preprocess():
         """
         #the input_gen_Y_index actually is the real_word_id of each sentence(predict whloe sentence)!
         print("input_GEN_Y" ,len(input_gen_Y),len(input_gen_Y_index))
-        return input_gen_Y_index, input_gen_Y_char, input_gen_Y_char_len 
+        return input_gen_Y_index#, input_gen_Y_char, input_gen_Y_char_len 
 
 
 
 
     def prepare_mlm_data_X(self, input_mlm_X, max_mask_len_per_sent,data_type, mode):
         input_mlm_X_index , mask_positions ,_ = self.convert2index(input_mlm_X,"UNK")
-        input_mlm_X_char,input_mlm_X_char_len = self.sent2char(input_mlm_X ,data_type, mode)
+        #input_mlm_X_char,input_mlm_X_char_len = self.sent2char(input_mlm_X ,data_type, mode)
         input_mlm_X_index = np.array(input_mlm_X_index)
         pad_mask_positions=[]
         pad_mask_weights = []
@@ -226,11 +231,11 @@ class Preprocess():
             #print ("pad_mask_positions",tmp,"pad_mask_weights",tmp2)
             #print("tmmmmp",len(tmp),max_mask_len_per_sent)
             assert len(tmp) == max_mask_len_per_sent 
-        return input_mlm_X_index , input_mlm_X_char, input_mlm_X_char_len , pad_mask_positions , pad_mask_weights
+        return input_mlm_X_index , pad_mask_positions , pad_mask_weights
     def prepare_gen_data_X(self, input_gen_X, max_len,data_type,mode):
         #the data input has been the same right shape/max_sent_len
         input_gen_X_index , _ , gen_X_sos = self.convert2index(input_gen_X,"UNK")
-        input_gen_X_char,input_gen_X_char_len = self.sent2char(input_gen_X ,data_type, mode)
+        #input_gen_X_char,input_gen_X_char_len = self.sent2char(input_gen_X ,data_type, mode)
         input_gen_X_index = np.array(input_gen_X_index)
         pad_positions=[]
         pad_weights = []
@@ -253,7 +258,7 @@ class Preprocess():
             #print ("pad_mask_positions",tmp,"pad_mask_weights",tmp2)
             #print("tmmmmp",len(tmp),max_mask_len_per_sent)
             assert len(tmp) == max_len 
-        return input_gen_X_index , input_gen_X_char, input_gen_X_char_len , pad_positions , pad_weights ,gen_X_sos 
+        return input_gen_X_index  , pad_positions , pad_weights ,gen_X_sos 
 
     def mlm_fix_mask(self, max_mask_len_per_sent,mlm_mask_positons, mlm_mask_words, mlm_mask_weights):
         new_mlm_mask_postions=[]

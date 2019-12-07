@@ -8,7 +8,7 @@ Created on Mon Jan 21 16:37:55 2019
 import tensorflow as tf
 import numpy as np
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '0' #use GPU with ID=0
+os.environ["CUDA_VISIBLE_DEVICES"] = '0,1,2,3' #use GPU with ID=0
 
 def gelu(x):
   """Gaussian Error Linear Unit.

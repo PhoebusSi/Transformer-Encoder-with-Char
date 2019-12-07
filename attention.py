@@ -5,7 +5,8 @@ Created on Sun Jan 20 18:53:17 2019
 @author: jbk48
 """
 
-
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
 import numpy as np
 import tensorflow as tf
 
@@ -50,7 +51,7 @@ class Attention:
         self.batch_size = batch_size
 
     def multi_head(self, q, k, v, future,sos,seq_len):
-        with tf.variable_scope("multi-head",reuse=False) as scope:
+        #with tf.variable_scope("multi-head",reuse=False) as scope:
             q, k, v = self._linear_projection(q, k, v)
             qs, ks, vs = self._split_heads(q, k, v)
             outputs = self._scaled_dot_product(qs, ks, vs,future,sos, seq_len)
@@ -58,7 +59,8 @@ class Attention:
             print("\noutput&&moddel_dim",output,self.model_dim)
             output = tf.layers.dense(output, self.model_dim)
 
-        return tf.nn.dropout(output, 1.0 - self.dropout)
+            return tf.nn.dropout(output, 1.0 - self.dropout)
+    #return tf.nn.dropout(output, 1.0 - self.dropout)
 
     def classifier_head(self, q, k, v,future,sos,seq_len):
         q, k, v = self._linear_projection(q, k, v)

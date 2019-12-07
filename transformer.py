@@ -3,7 +3,8 @@
 Created on Mon Jan 21 16:33:17 2019
 @author: jbk48
 """
-
+from tensorflow import keras
+#import tensorflow.compat.v1 as tf
 import tensorflow as tf
 import six
 import numpy as np
@@ -134,7 +135,7 @@ class Encoder:
             b = dense_layer(self.n_class,clf_pool_o3)
             print('aa',a,'bb',b)
             #logits=K.switch(tf.equal(tf.constant(1.0),model_type), a,b)#dense_layer(self.pre_n_class,o3), dense_layer(self.n_class,o3))
-            logits = tf.cond(tf.equal(tf.constant(1.0),model_type),lambda:a,lambda:b)
+            logits = tf.cond(tf.equal(tf.constant(0.0),model_type),lambda:b,lambda:a)
             #logits=tf.cond(tf.equal(tf.constant(1),model_type),lambda: Dense(inputs=o3, units=self.pre_n_class, activation=None),lambda: Dense(inputs=o3, units=self.n_class, activation=None))#self.n_class)#.item()
             # logits is the predictions for labels of pre_training1 and train!
             """
@@ -194,8 +195,8 @@ class Encoder:
             with tf.variable_scope("transform"):
                 input_tensor = tf.layers.dense(
                         input_tensor,
-                        #units=self.model_dim,
-                        units = 64,#limit the model_dim has to be the dim of the words_embedding
+                        units=self.model_dim,
+                        #units = self.model_dim,#limit the model_dim has to be the dim of the words_embedding
                         activation=self.get_activation(self.hidden_act),
                         kernel_initializer=self.create_initializer(0.02))
                 input_tensor = self.layer_norm(input_tensor)

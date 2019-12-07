@@ -7,8 +7,10 @@ Created on Sat Mar  2 12:55:38 2019
 
 import numpy as np
 import tensorflow as tf
+#import tensorflow.compat.v1 as tf
 import transformer
 import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
 import datetime
 import preprocess
 import pandas as pd
@@ -16,17 +18,18 @@ from attention import positional_encoding
 #import os 
 #tf.reset_default_graph()
 config = tf.ConfigProto()
+#config = tf.compat.v1.ConfigProto()
 config.gpu_options.allow_growth = True
 class Model:
 
-    def __init__(self, data_type,loss_type, labeled_data_num,topic_num, word_dim, char_dim, max_sent_len, max_char_len, pre_train_learning_rate,train_learning_rate,num_pre_train1_steps, num_train_steps,max_mask_words_per_sent,hidden_act):
+    def __init__(self, data_type,loss_type, labeled_data_num,topic_num, word_dim, max_sent_len, pre_train_learning_rate,train_learning_rate,num_pre_train1_steps, num_train_steps,max_mask_words_per_sent,hidden_act):
         self.labeled_data_num = labeled_data_num 
         self.loss_type = loss_type
         self.topic_num = topic_num
         self.word_dim = word_dim
-        self.char_dim = char_dim
+        #self.char_dim = char_dim
         self.max_sent_len = max_sent_len
-        self.max_char_len = max_char_len
+        #self.max_char_len = max_char_len
         self.pre_train_learning_rate = pre_train_learning_rate
         self.train_learning_rate = train_learning_rate
         self.num_train_steps = num_train_steps
@@ -34,7 +37,7 @@ class Model:
         self.max_mask_words_per_sent = max_mask_words_per_sent 
         self.hidden_act = hidden_act
         ## Preprocess data
-        self.prepro = preprocess.Preprocess(self.char_dim, self.max_sent_len, self.max_char_len)
+        self.prepro = preprocess.Preprocess(self.max_sent_len)
         self.vocab_size = self.prepro.vocab_size
         if data_type == 'ag':
             base_dir = 'data/AG/'
@@ -61,46 +64,45 @@ class Model:
         #self.train_X, self.train_seq_length, self.train_Y, self.test_X, self.test_seq_length, self.test_Y ,self.pre_train1_X, self.pre_train1_seq_length, self.pre_train1_Y,self.pre_train2_X, self.pre_train2_seq_length, self.pre_train2_Y,self.pre_train3_X, self.pre_train3_seq_length, self.pre_train3_Y = self.prepro.load_data("./low_resource_AG_DATA/train100.csv", "./low_resource_AG_DATA/test.csv", self.max_sent_len,pre_train1_filename="./low_resource_AG_DATA/TC_data_5topic.csv")
         (self.train_X, self.train_seq_length, self.train_Y, 
                 self.test_X, self.test_seq_length, self.test_Y ,
-                self.pre_train1_X, self.pre_train1_seq_length, self.pre_train1_Y,
-                self.pre_train2_X, self.pre_train2_seq_length, self.pre_train2_Y,
-                self.pre_train3_X, self.pre_train3_seq_length, self.pre_train3_Y) = self.prepro.load_data(
+                self.pre_train1_X, self.pre_train1_seq_length, self.pre_train1_Y) = self.prepro.load_data(
                         train_file_path,test_file_path, self.max_sent_len,pre_train1_filename=clf_file_path)
         #self.mlm_X ,self.mlm_Y, self.mlm_seq_length = self.prepro.load_mlm_data("./low_resource_AG_DATA/maskedLM/MLM_data_mask_5topic.csv","./low_resource_AG_DATA/maskedLM/MLM_data_raw_5topic.csv",self.max_sent_len)
         self.mlm_X ,self.mlm_Y, self.mlm_seq_length = self.prepro.load_mlm_data(mlm_masked_file_path,mlm_raw_file_path,self.max_sent_len)
         self.gen_X ,self.gen_Y, self.gen_seq_length = self.prepro.load_mlm_data(gen_inp_file_path,gen_out_file_path,self.max_sent_len)
-        self.word_embedding, self.char_embedding = self.prepro.prepare_embedding(self.char_dim)
+        self.word_embedding = self.prepro.prepare_embedding()
         print("word_embedding",self.word_embedding)
-        self.train_X, self.train_X_char, self.train_X_char_len, self.train_Y = self.prepro.prepare_data(self.train_X, self.train_Y, data_type, "train")
-        self.test_X, self.test_X_char, self.test_X_char_len, self.test_Y = self.prepro.prepare_data(self.test_X, self.test_Y, data_type,"test")
-        self.mlm_X, self.mlm_X_char, self.mlm_X_char_len, self.mlm_positions,self.mlm_weights = self.prepro.prepare_mlm_data_X(self.mlm_X, self.max_mask_words_per_sent, data_type,"mlm_pretrain_mask_X")
-        self.mlm_Y, self.mlm_Y_char, self.mlm_Y_char_len, self.mlm_words = self.prepro.prepare_mlm_data_Y(self.mlm_Y, self.max_mask_words_per_sent,self.mlm_positions,data_type,"mlm_pretrain_Y")
+        self.train_X,  self.train_Y = self.prepro.prepare_data(self.train_X, self.train_Y, data_type, "train")
+        self.test_X,   self.test_Y = self.prepro.prepare_data(self.test_X, self.test_Y, data_type,"test")
+        self.mlm_X,  self.mlm_positions,self.mlm_weights = self.prepro.prepare_mlm_data_X(self.mlm_X, self.max_mask_words_per_sent, data_type,"mlm_pretrain_mask_X")
+        self.mlm_Y,  self.mlm_words = self.prepro.prepare_mlm_data_Y(self.mlm_Y, self.max_mask_words_per_sent,self.mlm_positions,data_type,"mlm_pretrain_Y")
         self.mlm_positons,self.mlm_words,self.mlm_weights = self.prepro.mlm_fix_mask(self.max_mask_words_per_sent,self.mlm_positions,self.mlm_words,self.mlm_weights)
         
-        self.gen_X, self.gen_X_char, self.gen_X_char_len, self.gen_positions,self.gen_weights ,self.gen_X_sos= self.prepro.prepare_gen_data_X(self.gen_X, self.max_sent_len,data_type, "gen_pretrain_X")
-        self.gen_Y, self.gen_Y_char, self.gen_Y_char_len  = self.prepro.prepare_gen_data_Y(self.gen_Y ,data_type,"gen_pretrain_Y")
+        self.gen_X, self.gen_positions,self.gen_weights ,self.gen_X_sos= self.prepro.prepare_gen_data_X(self.gen_X, self.max_sent_len,data_type, "gen_pretrain_X")
+        self.gen_Y  = self.prepro.prepare_gen_data_Y(self.gen_Y ,data_type,"gen_pretrain_Y")
         self.gen_words = self.gen_Y
         #print("xxx?",self.pre_train1_seq_length)
         if len(self.pre_train1_seq_length):
-                self.pre_train1_X, self.pre_train1_X_char, self.pre_train1_X_char_len, self.pre_train1_Y = self.prepro.prepare_data(self.pre_train1_X, self.pre_train1_Y,data_type, "pre_train1")
-                 
+                self.pre_train1_X,  self.pre_train1_Y = self.prepro.prepare_data(self.pre_train1_X, self.pre_train1_Y,data_type, "pre_train1")
+        """         
         if len(self.pre_train2_seq_length):
                 self.pre_train2_X, self.pre_train2_X_char, self.pre_train2_X_char_len, self.pre_train2_Y = self.prepro.prepare_data(self.pre_train2_X, self.pre_train2_Y, data_type,"pre_train2")
         if len(self.pre_train3_seq_length):
                 self.pre_train3_X, self.pre_train3_X_char, self.pre_train3_X_char_len, self.pre_train3_Y = self.prepro.prepare_data(self.pre_train3_X, self.pre_train3_Y, data_type,"pre_train3")
+        """
         ## Placeholders
         self.word_input = tf.placeholder(tf.int32, shape = [None, max_sent_len], name = 'word')
         self.mlm_word_input = tf.placeholder(tf.int32, shape = [None, max_sent_len], name = 'mlm_word')
         self.gen_word_input = tf.placeholder(tf.int32, shape = [None, max_sent_len], name = 'gen_word')
-        self.char_input = tf.placeholder(tf.int32, shape = [None, max_sent_len, max_char_len], name = 'char')
-        self.mlm_char_input = tf.placeholder(tf.float32, shape = [None, max_sent_len, max_char_len], name = 'mlm_X_char')
-        self.gen_char_input = tf.placeholder(tf.float32, shape = [None, max_sent_len, max_char_len], name = 'gen_X_char')
+        #self.char_input = tf.placeholder(tf.int32, shape = [None, max_sent_len, max_char_len], name = 'char')
+        #self.mlm_char_input = tf.placeholder(tf.float32, shape = [None, max_sent_len, max_char_len], name = 'mlm_X_char')
+        #self.gen_char_input = tf.placeholder(tf.float32, shape = [None, max_sent_len, max_char_len], name = 'gen_X_char')
         self.label = tf.placeholder(tf.int32, shape = [None], name = 'label')
         self.seq_len = tf.placeholder(tf.int32, shape = [None])
         self.mlm_seq_len = tf.placeholder(tf.int32, shape = [None])
         self.gen_seq_len = tf.placeholder(tf.int32, shape = [None])
-        self.char_len = tf.placeholder(tf.int32, [None, max_sent_len])
-        self.mlm_char_len = tf.placeholder(tf.int32, [None, max_sent_len])
-        self.gen_char_len = tf.placeholder(tf.int32, [None, max_sent_len])
+        #self.char_len = tf.placeholder(tf.int32, [None, max_sent_len])
+        #self.mlm_char_len = tf.placeholder(tf.int32, [None, max_sent_len])
+        #self.gen_char_len = tf.placeholder(tf.int32, [None, max_sent_len])
         self.dropout = tf.placeholder(tf.float32, shape = ())
         self.model_type = tf.placeholder(tf.float32, shape = ()) 
         self.mlm_mask_positions = tf.placeholder(tf.int32,shape = [None, self.max_mask_words_per_sent],name = 'mask_pos') 
@@ -132,11 +134,11 @@ class Model:
         train_seq_length = self.pre_train1_seq_length
         train(self, batch_size, training_epochs, char_mode)
     """
-    def pre_train1(self,model_path,model_name, batch_size, training_epochs, char_mode,loss,mlm_loss,gen_loss,optimizer,logits,learning_rate,pre_train1_Step,train_Step):
+    def pre_train1(self,model_path,model_name, batch_size, training_epochs, loss,mlm_loss,gen_loss,optimizer,logits,learning_rate,pre_train1_Step,train_Step):
         self.batch_size = batch_size
         """
-        loss, optimizer, logits= self.build_model(self.word_input, self.char_input, self.label, self.seq_len, 
-                                                   self.char_len, self.num_train_steps, char_mode, model_type='pre_train1')
+        loss, optimizer, logits= self.build_model(self.word_input, self.label, self.seq_len, 
+                                                   self.num_train_steps,  model_type='pre_train1')
         """
         print("\nLOGITS,SELFLABEL",logits,self.label)
         accuracy = self.get_accuracy(logits, self.label)        
@@ -182,25 +184,25 @@ class Model:
             for epoch in range(training_epochs):
         
                 train_acc, train_loss,train_mlm_loss,train_gen_loss = 0., 0., 0. ,0.  
-                print ('epocj_max_X_char_len before  VS before pre_train1_X ',self.mlm_X_char_len.shape , self.pre_train1_X.shape, self.pre_train1_X_char.shape)
-                (self.pre_train1_X, self.pre_train1_X_char, self.pre_train1_X_char_len,self.pre_train1_seq_length, self.pre_train1_Y,
-                self.mlm_X, self.mlm_X_char, self.mlm_X_char_len,self.mlm_seq_length, self.mlm_shuffle_positions,self.mlm_shuffle_words,self.mlm_shuffle_weights,
-                self.gen_X, self.gen_X_char, self.gen_X_char_len, self.gen_seq_length,self.gen_shuffle_positions,self.gen_shuffle_words,self.gen_shuffle_weights ,self.gen_shuffle_sos)= self.shuffle_pretrain(
+                print ('epocj_max_X_r_len before  VS before pre_train1_X ',self.pre_train1_X.shape)
+                (self.pre_train1_X, self.pre_train1_seq_length, self.pre_train1_Y,
+                self.mlm_X, self.mlm_seq_length, self.mlm_shuffle_positions,self.mlm_shuffle_words,self.mlm_shuffle_weights,
+                self.gen_X, self.gen_seq_length,self.gen_shuffle_positions,self.gen_shuffle_words,self.gen_shuffle_weights ,self.gen_shuffle_sos)= self.shuffle_pretrain(
                         self.pre_train1_X,
-                        self.pre_train1_X_char, 
-                        self.pre_train1_X_char_len, 
+                        #self.pre_train1_X_char, 
+                        #self.pre_train1_X_char_len, 
                         self.pre_train1_seq_length,
                         self.pre_train1_Y,
                         self.mlm_X,
-                        self.mlm_X_char, 
-                        self.mlm_X_char_len, 
+                        #self.mlm_X_char, 
+                        #self.mlm_X_char_len, 
                         self.mlm_seq_length,
                         self.mlm_positions, 
                         self.mlm_words, 
                         self.mlm_weights,
                         self.gen_X,
-                        self.gen_X_char, 
-                        self.gen_X_char_len,
+                        #self.gen_X_char, 
+                        #self.gen_X_char_len,
                         self.gen_seq_length,
                         self.gen_positions, 
                         self.gen_words, 
@@ -208,29 +210,29 @@ class Model:
                         self.gen_X_sos) 
                 """
                 #combine the 3 pretraining task's shuffle process in one functions to keep a sent is doing 3 tasks at the same time 
-                self.pre_train1_X, self.pre_train1_X_char, self.pre_train1_X_char_len, self.pre_train1_Y = self.shuffle(self.pre_train1_X, 
-                                                                                                    self.pre_train1_X_char, 
-                                                                                                    self.pre_train1_X_char_len, 
+                self.pre_train1_X,  self.pre_train1_Y = self.shuffle(self.pre_train1_X, 
+                                                                                                    #self.pre_train1_X_char, 
+                                                                                                    #self.pre_train1_X_char_len, 
                                                                                                     self.pre_train1_Y)
                 print ('after pre_train1_X ' , self.pre_train1_X.shape)
-                self.mlm_X, self.mlm_X_char, self.mlm_X_char_len, self.mlm_shuffle_positions,self.mlm_shuffle_words,self.mlm_shuffle_weights = self.shuffle_mlm(self.mlm_X,
-                        self.mlm_X_char, 
-                        self.mlm_X_char_len, 
+                self.mlm_X, self.mlm_shuffle_positions,self.mlm_shuffle_words,self.mlm_shuffle_weights = self.shuffle_mlm(self.mlm_X,
+                        #self.mlm_X_char, 
+                        #self.mlm_X_char_len, 
                         self.mlm_positions, 
                         self.mlm_words, 
                         self.mlm_weights)
-                self.gen_X, self.gen_X_char, self.gen_X_char_len, self.gen_shuffle_positions,self.gen_shuffle_words,self.gen_shuffle_weights = self.shuffle_mlm(self.gen_X,
-                        self.gen_X_char, 
-                        self.gen_X_char_len, 
+                self.gen_X, self.gen_shuffle_positions,self.gen_shuffle_words,self.gen_shuffle_weights = self.shuffle_mlm(self.gen_X,
+                        #self.gen_X_char, 
+                        #self.gen_X_char_len, 
                         self.gen_positions, 
                         self.gen_words, 
                         self.gen_weights,
                         self.gen_X_sos) 
                 """
                 """
-                self.train_X, self.train_X_char, self.train_X_char_len, self.train_Y = self.shuffle(self.pre_train1_X, 
-                                                                                                    self.pre_train1_X_char, 
-                                                                                                    self.pre_train1_X_char_len, 
+                self.train_X, self.train_Y = self.shuffle(self.pre_train1_X, 
+                                                                                                    #self.pre_train1_X_char, 
+                                                                                                    #self.pre_train1_X_char_len, 
                                                                                                     self.pre_train1_Y)
                 """
                 for step in range(num_train_batch):
@@ -241,32 +243,32 @@ class Model:
                         mode = None 
                     print ("\nwhether init_MODE?",mode)
                     """
-                    pre_train1_batch, pre_train1_batch_char, pre_train1_batch_char_len, pre_train1_batch_Y, pre_train1_batch_seq_len = get_batch(self.pre_train1_X, 
-                                                                                                                                                 self.pre_train1_X_char, 
-                                                                                                                                                 self.pre_train1_X_char_len, 
+                    pre_train1_batch, pre_train1_batch_Y, pre_train1_batch_seq_len = get_batch(self.pre_train1_X, 
+                                                                                                                                                 #self.pre_train1_X_char, 
+                                                                                                                                                 #self.pre_train1_X_char_len, 
                                                                                                                                                  self.pre_train1_Y, 
                                                                                                                                                  self.pre_train1_seq_length,
                                                                                                                                                  self.batch_size,
                                                                                                                                                  mode)           
                     """
-                    ( train_batch,train_batch_char,train_batch_char_len,train_batch_Y,train_batch_seq_len,
-                            mlm_batch_X,mlm_batch_X_char,mlm_batch_X_char_len, mlm_batch_X_seq_len,
+                    ( train_batch,train_batch_Y,train_batch_seq_len,
+                            mlm_batch_X, mlm_batch_X_seq_len,
                             mlm_batch_mask_positions,mlm_batch_mask_words,mlm_batch_mask_weights ,
-                            gen_batch_X,gen_batch_X_char,gen_batch_X_char_len, gen_batch_X_seq_len,
+                            gen_batch_X, gen_batch_X_seq_len,
                             gen_batch_pad_positions,gen_batch_pad_words,gen_batch_pad_weights,gen_batch_pad_sos) = get_pretrain_batch(
-                            self.pre_train1_X, self.pre_train1_X_char, self.pre_train1_X_char_len, 
+                            self.pre_train1_X,  
                             self.pre_train1_Y, self.pre_train1_seq_length, batch_size,
-                            self.mlm_X, self.mlm_X_char,self.mlm_X_char_len,
+                            self.mlm_X, 
                             self.mlm_shuffle_positions,self.mlm_shuffle_words,self.mlm_shuffle_weights,self.mlm_seq_length,
-                            self.gen_X, self.gen_X_char,self.gen_X_char_len,
+                            self.gen_X, 
                             self.gen_shuffle_positions,self.gen_shuffle_words,self.gen_shuffle_weights,self.gen_seq_length,self.gen_shuffle_sos,
                             mode = mode)
                     print("train_batch",train_batch.shape,train_batch)
                     #print("pre_train1",self.pre_train1_X.shape,self.pre_train1_X)
                     """
-                    train_batch, train_batch_char, train_batch_char_len, train_batch_Y, train_batch_seq_len = get_batch(self.pre_train1_X, 
-                                                                                                                        self.pre_train1_X_char, 
-                                                                                                                        self.pre_train1_X_char_len, 
+                    train_batch,  train_batch_Y, train_batch_seq_len = get_batch(self.pre_train1_X, 
+                                                                                                                        #self.pre_train1_X_char, 
+                                                                                                                        #self.pre_train1_X_char_len, 
                                                                                                                         self.pre_train1_Y, 
                                                                                                                         self.pre_train1_seq_length,
                                                                                                                         self.batch_size,
@@ -278,24 +280,27 @@ class Model:
                     feed_dict_train = {self.word_input: train_batch, self.char_input : train_batch_char, self.label: train_batch_Y,
                                        self.seq_len: train_batch_seq_len, self.char_len: train_batch_char_len, self.dropout : 0.2, self.model_type:1.0}
                     """
-                    feed_dict_train = {self.word_input: train_batch, self.char_input : train_batch_char, self.label: train_batch_Y,
-                                       self.seq_len: train_batch_seq_len, self.char_len: train_batch_char_len, self.dropout : 0.2, self.model_type:self.loss_type,
-                                       self.mlm_word_input: mlm_batch_X, self.mlm_char_input: mlm_batch_X_char, self.mlm_seq_len : mlm_batch_X_seq_len,
-                                       self.mlm_char_len: mlm_batch_X_char_len, self.mlm_mask_positions:mlm_batch_mask_positions, self.mlm_mask_words:mlm_batch_mask_words,
+                    feed_dict_train = {self.word_input: train_batch,  self.label: train_batch_Y,
+                                       self.seq_len: train_batch_seq_len,  self.dropout : 0.2, self.model_type:self.loss_type,
+                                       self.mlm_word_input: mlm_batch_X,  self.mlm_seq_len : mlm_batch_X_seq_len,
+                                       self.mlm_mask_positions:mlm_batch_mask_positions, self.mlm_mask_words:mlm_batch_mask_words,
                                        self.mlm_mask_weights:mlm_batch_mask_weights,
-                                       self.gen_word_input: gen_batch_X, self.gen_char_input: gen_batch_X_char, self.gen_seq_len: gen_batch_X_seq_len,
-                                       self.gen_char_len : gen_batch_X_char_len, self.gen_pad_positions:gen_batch_pad_positions, self.gen_pad_words: gen_batch_pad_words, 
+                                       self.gen_word_input: gen_batch_X, self.gen_seq_len: gen_batch_X_seq_len,
+                                       self.gen_pad_positions:gen_batch_pad_positions, self.gen_pad_words: gen_batch_pad_words, 
                                        self.gen_pad_weights:gen_batch_pad_weights, self.gen_pad_sos : gen_batch_pad_sos
                                        }
-                    char_embedding_matrix = sess.run(self.prepro.clear_char_embedding_padding, feed_dict = feed_dict_train) ## clear 0 index to 0 vector
+                    #char_embedding_matrix = sess.run(self.prepro.clear_char_embedding_padding, feed_dict = feed_dict_train) ## clear 0 index to 0 vector
                     _, train_batch_loss ,train_batch_mlm_loss, train_batch_gen_loss,learning_rate_num,pre_train1_Step_num,train_Step_num= sess.run([optimizer,loss, mlm_loss,gen_loss,learning_rate,pre_train1_Step,train_Step], feed_dict = feed_dict_train)
                     print("\ntrain_batch_Loss + train_batch_number",train_batch_loss, num_train_batch)          
+                    train_batch_loss = train_batch_loss[0]
                     train_loss += train_batch_loss / num_train_batch        
                     train_mlm_loss += train_batch_mlm_loss / num_train_batch        
                     train_gen_loss += train_batch_gen_loss / num_train_batch        
                     train_batch_acc = sess.run(accuracy , feed_dict = feed_dict_train)
                     train_acc += train_batch_acc / num_train_batch
                     print("\ntrain_batch_predict",logits)
+                    print(epoch+1, step+1, train_batch_loss, train_batch_acc, train_batch_mlm_loss,train_batch_gen_loss, learning_rate_num,pre_train1_Step_num,train_Step_num)
+                    print(epoch+1, step+1, type(train_batch_loss), type(train_batch_acc), type(train_batch_mlm_loss),type(train_batch_gen_loss), type(learning_rate_num),type(pre_train1_Step_num),type(train_Step_num))
                     print("epoch : {:02d} step : {:04d} loss = {:.6f} accuracy= {:.6f} mlm_loss = {:.6f} gen_loss = {:.6f} learning_rate = {:.10f},pre_train1_step = {:02d},train_Step = {:02d}".format(epoch+1, step+1, train_batch_loss, train_batch_acc, train_batch_mlm_loss,train_batch_gen_loss, learning_rate_num,pre_train1_Step_num,train_Step_num))
 
                 
@@ -306,24 +311,24 @@ class Model:
                         mode = "init"
                     else:
                         mode = None
-                    test_batch, test_batch_char, test_batch_char_len, test_batch_Y, test_batch_seq_len = get_batch(self.test_X, 
-                                                                                                                   self.test_X_char, 
-                                                                                                                   self.test_X_char_len, 
+                    test_batch, test_batch_Y, test_batch_seq_len = get_batch(self.test_X, 
+                                                                                                                   #self.test_X_char, 
+                                                                                                                   #self.test_X_char_len, 
                                                                                                                    self.test_Y, 
                                                                                                                    self.test_seq_length,
                                                                                                                    self.batch_size,
                                                                                                                    mode) 
                     mlm_batch_positions_for_test,mlm_batch_words_for_test,mlm_batch_weights_for_test,gen_batch_positions_for_test,gen_batch_words_for_test,gen_batch_weights_for_test,gen_batch_sos_for_test=self.get_empty_mlm_specail_batch(self.batch_size,self.max_mask_words_per_sent,self.max_sent_len)
-                    feed_dict_test = {self.word_input: test_batch, self.char_input: test_batch_char, self.label: test_batch_Y, 
-                                      self.seq_len: test_batch_seq_len, self.char_len: test_batch_char_len, self.dropout : 0.0,self.model_type:0.0,
-                                      self.mlm_word_input: test_batch, self.mlm_char_input: test_batch_char, self.mlm_seq_len : test_batch_seq_len,
-                                      self.mlm_char_len: test_batch_char_len, self.mlm_mask_positions:mlm_batch_positions_for_test, self.mlm_mask_words:mlm_batch_words_for_test,
+                    feed_dict_test = {self.word_input: test_batch, self.label: test_batch_Y, 
+                                      self.seq_len: test_batch_seq_len, self.dropout : 0.0,self.model_type:0.0,
+                                      self.mlm_word_input: test_batch, self.mlm_seq_len : test_batch_seq_len,
+                                      self.mlm_mask_positions:mlm_batch_positions_for_test, self.mlm_mask_words:mlm_batch_words_for_test,
                                       self.mlm_mask_weights:mlm_batch_weights_for_test,
                                       #self.mlm_word_input: mlm_batch_X, self.mlm_char_input: mlm_batch_X_char, self.mlm_seq_len : mlm_batch_X_seq_len,
                                       #self.mlm_char_len: mlm_batch_X_char_len, self.mlm_mask_positions:mlm_batch_positions_for_test, self.mlm_mask_words:mlm_batch_words_for_test,
                                       #self.mlm_mask_weights:mlm_batch_weights_for_test,
-                                      self.gen_word_input: test_batch, self.gen_char_input: test_batch_char, self.gen_seq_len: test_batch_seq_len,
-                                      self.gen_char_len: test_batch_char_len, self.gen_pad_positions:gen_batch_positions_for_test, self.gen_pad_words: gen_batch_words_for_test, 
+                                      self.gen_word_input: test_batch, self.gen_seq_len: test_batch_seq_len,
+                                      self.gen_pad_positions:gen_batch_positions_for_test, self.gen_pad_words: gen_batch_words_for_test, 
                                       self.gen_pad_weights:gen_batch_weights_for_test, self.gen_pad_sos : gen_batch_sos_for_test}
                     # Compute average loss
                     test_batch_loss = sess.run(loss, feed_dict = feed_dict_test)
@@ -342,21 +347,21 @@ class Model:
                 train_acc_list.append(train_acc)
                 test_loss_list.append(test_loss)
                 test_acc_list.append(test_acc)
-                np.save(modelpath + "char_embedding_{}.npy".format(char_mode), char_embedding_matrix)
+                #np.save(modelpath + "char_embedding_{}.npy".format(char_mode), char_embedding_matrix)
             
             train_loss = pd.DataFrame({"train_loss":train_loss_list})
             train_acc = pd.DataFrame({"train_acc":train_acc_list})
             test_loss = pd.DataFrame({"test_loss":test_loss_list})
             test_acc = pd.DataFrame({"test_acc":test_acc_list})
             df = pd.concat([train_loss,train_acc,test_loss,test_acc], axis = 1)
-            df.to_csv("./pre_train_results_{}.csv".format(char_mode), sep =",", index=False)
+            df.to_csv("./pre_train_results.csv".format(), sep =",", index=False)
             elapsed_time = datetime.datetime.now() - start_time
             print("{}".format(elapsed_time))
             save_path = saver.save(sess, modelpath + modelName)
             print ('save_path',save_path)
 
         
-    def train(self, model_path,model_name,batch_size, training_epochs, char_mode, loss, optimizer, logits,learning_rate,pre_train1_Step,train_Step):
+    def train(self, pretrain_model_path,train_model_path,model_name,batch_size, training_epochs, loss, optimizer, logits,learning_rate,pre_train1_Step,train_Step):
         self.batch_size = batch_size
         #build_model se the number of classes!!
         """
@@ -376,7 +381,8 @@ class Model:
         #modelName = "tmp_model_transformer_ag_news_{0}_{1}.ckpt".format(char_mode,describe)
         #modelpath = "./tmp_model_transformer_IMDB_{0}_{1}/".format(char_mode,describe)
         #modelName = "tmp_model_transformer_IMDB_{0}_{1}.ckpt".format(char_mode,describe)
-        modelpath= model_path 
+        pretrain_modelpath= pretrain_model_path 
+        train_modelpath= train_model_path 
         modelName = model_name 
         saver = tf.train.Saver()
         
@@ -386,10 +392,10 @@ class Model:
         test_acc_list = []
         test_loss_list = []
         
-        if(not os.path.exists(modelpath)):
-            os.mkdir(modelpath)
-        ckpt = tf.train.get_checkpoint_state(modelpath)
-        modelfile =  tf.train.latest_checkpoint(modelpath)
+        if(not os.path.exists(pretrain_modelpath)):
+            os.mkdir(pretrain_modelpath)
+        ckpt = tf.train.get_checkpoint_state(pretrain_modelpath)
+        modelfile =  tf.train.latest_checkpoint(pretrain_modelpath)
         print('modelfile\nmodelfile:modelpath+modelName',modelfile,modelpath+modelName)
         #tf.reset_default_graph()
         with tf.Session(config = config) as sess:
@@ -399,7 +405,7 @@ class Model:
             sess.run(init)
             if(ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path)):
                 print("\n\ncheckpoint_exists\n\n",ckpt.model_checkpoint_path)
-                self.load_char_embedding(modelpath + "char_embedding_{}.npy".format(char_mode))
+                #self.load_char_embedding(modelpath + "char_embedding_{}.npy".format(char_mode))
                 if modelfile is not None:
                     #tf.reset_default_graph()
 
@@ -416,9 +422,9 @@ class Model:
                 train_acc, train_loss = 0., 0.       
 
                 
-                self.train_X, self.train_X_char, self.train_X_char_len,self.train_seq_length, self.train_Y = self.shuffle(self.train_X, 
-                                                                                                    self.train_X_char, 
-                                                                                                    self.train_X_char_len, 
+                self.train_X, self.train_seq_length, self.train_Y = self.shuffle(self.train_X, 
+                                                                                                    #self.train_X_char, 
+                                                                                                    #self.train_X_char_len, 
                                                                                                     self.train_seq_length,
                                                                                                     self.train_Y)
                 for step in range(num_train_batch):
@@ -426,22 +432,22 @@ class Model:
                         mode = "init"
                     else:
                         mode = None
-                    train_batch, train_batch_char, train_batch_char_len, train_batch_Y, train_batch_seq_len = get_batch(self.train_X, 
-                                                                                                                        self.train_X_char, 
-                                                                                                                        self.train_X_char_len, 
+                    train_batch, train_batch_Y, train_batch_seq_len = get_batch(self.train_X, 
+                                                                                                                        #self.train_X_char, 
+                                                                                                                        #self.train_X_char_len, 
                                                                                                                         self.train_Y, 
                                                                                                                         self.train_seq_length,
                                                                                                                         self.batch_size,
                                                                                                                         mode)           
                     #mlm_batch_positions_for_test,mlm_batch_words_for_test,mlm_batch_weights_for_test=self.get_empty_mlm_specail_batch(self.batch_size,self.max_mask_words_per_sent,self.max_sent_len)
                     mlm_batch_positions_for_test,mlm_batch_words_for_test,mlm_batch_weights_for_test,gen_batch_positions_for_test,gen_batch_words_for_test,gen_batch_weights_for_test,gen_batch_sos_for_test=self.get_empty_mlm_specail_batch(self.batch_size,self.max_mask_words_per_sent,self.max_sent_len)
-                    feed_dict_train = {self.word_input: train_batch, self.char_input : train_batch_char, self.label: train_batch_Y,
-                                       self.seq_len: train_batch_seq_len, self.char_len: train_batch_char_len, self.dropout : 0.2,self.model_type:0.0,
-                                       self.mlm_word_input: train_batch, self.mlm_char_input: train_batch_char, self.mlm_seq_len : train_batch_seq_len,
-                                       self.mlm_char_len: train_batch_char_len, self.mlm_mask_positions:mlm_batch_positions_for_test, self.mlm_mask_words:mlm_batch_words_for_test,
+                    feed_dict_train = {self.word_input: train_batch, self.label: train_batch_Y,
+                                       self.seq_len: train_batch_seq_len, self.dropout : 0.2,self.model_type:0.0,
+                                       self.mlm_word_input: train_batch, self.mlm_seq_len : train_batch_seq_len,
+                                       self.mlm_mask_positions:mlm_batch_positions_for_test, self.mlm_mask_words:mlm_batch_words_for_test,
                                        self.mlm_mask_weights:mlm_batch_weights_for_test,
-                                       self.gen_word_input: train_batch, self.gen_char_input: train_batch_char, self.gen_seq_len: train_batch_seq_len,
-                                       self.gen_char_len:train_batch_char_len, self.gen_pad_positions:gen_batch_positions_for_test, self.gen_pad_words: gen_batch_words_for_test, 
+                                       self.gen_word_input: train_batch, self.gen_seq_len: train_batch_seq_len,
+                                       self.gen_pad_positions:gen_batch_positions_for_test, self.gen_pad_words: gen_batch_words_for_test, 
                                        self.gen_pad_weights:gen_batch_weights_for_test, self.gen_pad_sos : gen_batch_sos_for_test}
                     #feed_dict_train = {self.word_input: train_batch, self.char_input : train_batch_char, self.label: train_batch_Y,
                     #                  self.seq_len: train_batch_seq_len, self.char_len: train_batch_char_len, self.dropout : 0.2,self.model_type:0.0,
@@ -449,7 +455,7 @@ class Model:
                     #                   self.mlm_char_len: mlm_batch_X_char_len, self.mlm_mask_positions:mlm_batch_mask_positions, self.mlm_mask_words:mlm_batch_mask_words,
                     #                   self.mlm_mask_weights:mlm_batch_mask_weights}
                     
-                    char_embedding_matrix = sess.run(self.prepro.clear_char_embedding_padding, feed_dict = feed_dict_train) ## clear 0 index to 0 vector
+                    #char_embedding_matrix = sess.run(self.prepro.clear_char_embedding_padding, feed_dict = feed_dict_train) ## clear 0 index to 0 vector
                     _, train_batch_loss ,learning_rate_num,pre_train1_Step_num,train_Step_num = sess.run([optimizer,loss,learning_rate,pre_train1_Step,train_Step], feed_dict = feed_dict_train)
                               
                     train_loss += train_batch_loss / num_train_batch          
@@ -464,22 +470,22 @@ class Model:
                         mode = "init"
                     else:
                         mode = None
-                    test_batch, test_batch_char, test_batch_char_len, test_batch_Y, test_batch_seq_len = get_batch(self.test_X, 
-                                                                                                                   self.test_X_char, 
-                                                                                                                   self.test_X_char_len, 
+                    test_batch, test_batch_Y, test_batch_seq_len = get_batch(self.test_X, 
+                                                                                                                   #self.test_X_char, 
+                                                                                                                   #self.test_X_char_len, 
                                                                                                                    self.test_Y, 
                                                                                                                    self.test_seq_length,
                                                                                                                    self.batch_size,
                                                                                                                    mode)
                     #mlm_batch_positions_for_test,mlm_batch_words_for_test,mlm_batch_weights_for_test=self.get_empty_mlm_specail_batch(self.batch_size,self.max_mask_words_per_sent)
                     mlm_batch_positions_for_test,mlm_batch_words_for_test,mlm_batch_weights_for_test,gen_batch_positions_for_test,gen_batch_words_for_test,gen_batch_weights_for_test,gen_batch_sos_for_test=self.get_empty_mlm_specail_batch(self.batch_size,self.max_mask_words_per_sent,self.max_sent_len)
-                    feed_dict_test = {self.word_input: test_batch, self.char_input: test_batch_char, self.label: test_batch_Y, 
-                                      self.seq_len: test_batch_seq_len, self.char_len: test_batch_char_len, self.dropout : 0.0,self.model_type:0.0,
-                                      self.mlm_word_input: test_batch, self.mlm_char_input: test_batch_char, self.mlm_seq_len : test_batch_seq_len,
-                                      self.mlm_char_len: test_batch_char_len, self.mlm_mask_positions:mlm_batch_positions_for_test, self.mlm_mask_words:mlm_batch_words_for_test,
+                    feed_dict_test = {self.word_input: test_batch, self.label: test_batch_Y, 
+                                      self.seq_len: test_batch_seq_len, self.dropout : 0.0,self.model_type:0.0,
+                                      self.mlm_word_input: test_batch, self.mlm_seq_len : test_batch_seq_len,
+                                      self.mlm_mask_positions:mlm_batch_positions_for_test, self.mlm_mask_words:mlm_batch_words_for_test,
                                       self.mlm_mask_weights:mlm_batch_weights_for_test,
-                                      self.gen_word_input: test_batch, self.gen_char_input: test_batch_char, self.gen_seq_len: test_batch_seq_len,
-                                      self.gen_char_len: test_batch_char_len, self.gen_pad_positions:gen_batch_positions_for_test, self.gen_pad_words: gen_batch_words_for_test, 
+                                      self.gen_word_input: test_batch, self.gen_seq_len: test_batch_seq_len,
+                                      self.gen_pad_positions:gen_batch_positions_for_test, self.gen_pad_words: gen_batch_words_for_test, 
                                       self.gen_pad_weights:gen_batch_weights_for_test, self.gen_pad_sos : gen_batch_sos_for_test}
                     #feed_dict_test = {self.word_input: test_batch, self.char_input: test_batch_char, self.label: test_batch_Y, 
                     #                  self.seq_len: test_batch_seq_len, self.char_len: test_batch_char_len, self.dropout : 0.0,self.model_type:0.0}
@@ -496,17 +502,17 @@ class Model:
                 train_acc_list.append(train_acc)
                 test_loss_list.append(test_loss)
                 test_acc_list.append(test_acc)
-                np.save(modelpath + "char_embedding_{}.npy".format(char_mode), char_embedding_matrix)
+                #np.save(modelpath + "char_embedding_{}.npy".format(char_mode), char_embedding_matrix)
             
             train_loss = pd.DataFrame({"train_loss":train_loss_list})
             train_acc = pd.DataFrame({"train_acc":train_acc_list})
             test_loss = pd.DataFrame({"test_loss":test_loss_list})
             test_acc = pd.DataFrame({"test_acc":test_acc_list})
             df = pd.concat([train_loss,train_acc,test_loss,test_acc], axis = 1)
-            df.to_csv("./results_{}.csv".format(char_mode), sep =",", index=False)
+            df.to_csv("./{}/{}/results_{}_{}.csv".format(self.data_type,self.topic_num,self.labeled_data_num), sep =",", index=False)
             elapsed_time = datetime.datetime.now() - start_time
             print("{}".format(elapsed_time))
-            save_path = saver.save(sess, modelpath + modelName)
+            save_path = saver.save(sess, train_modelpath + modelName)
             print ('save_path',save_path)
 
     def char_lstm(self, inputs, char_len, lstm_units, dropout, last=True, scope="char_lstm"): 
@@ -626,17 +632,18 @@ class Model:
         self.pre_train1_n_class=pre_train1_n_class
         self.bool_pre_train1 = bool_pre_train_1
         self.count = 1 # if model_dim has divided by 2 in pretrain1 ,then it keep itsalf in trainiing process
-    def build_model(self, word_inputs, char_inputs, labels, seq_len, char_len, num_pre_train1_steps, num_train_steps,
-            mlm_word_inputs,mlm_char_inputs,mlm_char_len,mlm_mask_positions,mlm_mask_words, mlm_mask_weights,
-            gen_word_inputs,gen_char_inputs,gen_char_len,gen_pad_positions,gen_pad_words,gen_pad_weights,gen_pad_sos,
-            char_mode, model_type):
+    def build_model(self, word_inputs, labels, seq_len,  num_pre_train1_steps, num_train_steps,
+            mlm_word_inputs,mlm_mask_positions,mlm_mask_words, mlm_mask_weights,
+            gen_word_inputs,gen_pad_positions,gen_pad_words,gen_pad_weights,gen_pad_sos,
+            model_type):
         print("Building model!")
-        print("\nchar mode here is ",char_mode)
+        #print("\nchar mode here is ",char_mode)
+        """
         gate = tf.constant(0)
         if(char_mode == "no_char" and self.count == 1):
             self.model_dim /= 2
             self.count=0
-        
+        """
         # Implements linear decay of the learning rate.
         pre_train1_global_step = tf.Variable(0, trainable=False)
         train_global_step = tf.Variable(0, trainable=False)
@@ -679,9 +686,9 @@ class Model:
                               batch_size=self.batch_size,
                               hidden_act = self.hidden_act,
                               vocab_size = self.vocab_size)
-        encoder_emb = self.build_embed(word_inputs, char_inputs, char_len, char_mode)
-        mlm_encoder_emb =self.build_embed(mlm_word_inputs , mlm_char_inputs, mlm_char_len, char_mode)
-        gen_encoder_emb =self.build_embed(gen_word_inputs , gen_char_inputs, gen_char_len, char_mode)
+        encoder_emb = self.build_embed(word_inputs)
+        mlm_encoder_emb =self.build_embed(mlm_word_inputs )
+        gen_encoder_emb =self.build_embed(gen_word_inputs )
         with tf.variable_scope("encoder_build",reuse=tf.AUTO_REUSE) as scope:
             loss,encoder_outputs,mlm_loss,gen_loss = encoder.build(encoder_emb,mlm_encoder_emb, gen_encoder_emb,seq_len ,labels,self.word_embedding , mlm_mask_positions,mlm_mask_words,mlm_mask_weights,gen_pad_positions,gen_pad_words,gen_pad_weights,gen_pad_sos,model_type)
             print("predict_outputs",encoder_outputs) 
@@ -708,7 +715,7 @@ class Model:
         gen_weights= np.zeros([batch_size,max_sent_length]).astype('float32')
         gen_sos= np.zeros([batch_size]).astype('int32')
         return mlm_positions,mlm_ids,mlm_weights,gen_positions,gen_ids,gen_weights,gen_sos
-    def build_embed(self, word_inputs, char_inputs, char_len, char_mode):
+    def build_embed(self, word_inputs):
         
         # Positional Encoding
         with tf.variable_scope("positional-encoding"):
@@ -721,7 +728,7 @@ class Model:
         encoded_inputs = tf.add(tf.nn.embedding_lookup(self.word_embedding,tf.cast( word_inputs,tf.int32)),
                          tf.nn.embedding_lookup(positional_encoded, position_inputs))
                
-        
+        """ 
         if(char_mode == "char_cnn"):
             char_inputs = tf.nn.embedding_lookup(self.char_embedding, tf.cast(char_inputs,tf.int32))
             kernels = [ 1,   2,   3,   4,   5,   6]
@@ -734,7 +741,8 @@ class Model:
             final_outputs = tf.concat([encoded_inputs,char_inputs], axis=2)
         elif(char_mode == "no_char"):
             final_outputs = encoded_inputs
-                    
+        """         
+        final_outputs = encoded_inputs
         return final_outputs
     
     def get_accuracy(self, logits, label):
@@ -743,89 +751,89 @@ class Model:
         accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
         return accuracy
     
-    def shuffle(self, train_X, train_X_char, train_X_char_len, train_seq_length,train_Y):
+    def shuffle(self, train_X, train_seq_length,train_Y):
         mask = np.random.permutation(len(train_X))
-        print("normal_train_X",train_X_char.shape)
+        #print("normal_train_X",train_X_char.shape)
         train_X = train_X[mask]
-        train_X_char = train_X_char[mask]
-        print("normal_shuffle_",train_X_char_len.shape)
-        train_X_char_len = train_X_char_len[mask]
+        #train_X_char = train_X_char[mask]
+        #print("normal_shuffle_",train_X_char_len.shape)
+        #train_X_char_len = train_X_char_len[mask]
         train_seq_length = np.array(train_seq_length)
         train_seq_length = train_seq_length[mask]
-        print("normal_shuffle_",train_X_char_len.shape)
+        #print("normal_shuffle_",train_X_char_len.shape)
         train_Y = train_Y[mask]
-        return train_X, train_X_char, train_X_char_len,train_seq_length, train_Y
-    def shuffle_mlm(self, mlm_X, mlm_X_char, mlm_X_char_len, mlm_positions, mlm_words, mlm_weights , gen_sos=0):
+        return train_X,train_seq_length, train_Y
+    def shuffle_mlm(self, mlm_X,mlm_positions, mlm_words, mlm_weights , gen_sos=0):
         mask = np.random.permutation(len(mlm_X))
         print("mask",len(mask),mask)
         mlm_X = mlm_X[mask]
-        mlm_X_char = mlm_X_char[mask]
+        #mlm_X_char = mlm_X_char[mask]
 
-        print("mlm_X_char_len",mlm_X_char_len.shape,mlm_X_char_len)
-        mlm_X_char_len = mlm_X_char_len[mask]
+        #print("mlm_X_char_len",mlm_X_char_len.shape,mlm_X_char_len)
+        #mlm_X_char_len = mlm_X_char_len[mask]
         mlm_positions = np.array(mlm_positions)
         mlm_words = np.array(mlm_words)
         mlm_weights = np.array(mlm_weights)
-        print("mlm_X_char_len_",len(mlm_X_char_len),mlm_X_char_len,"\nmlm_positions",mlm_positions)
+        #print("mlm_X_char_len_",len(mlm_X_char_len),mlm_X_char_len,"\nmlm_positions",mlm_positions)
         print("mlm_X_char_len_",mlm_positions.shape,mlm_words.shape,mlm_weights.shape,"\nmlm_positions",mlm_positions)
         mlm_positions = mlm_positions[mask]
         mlm_words = mlm_words[mask]
         mlm_weights = mlm_weights[mask]
         if gen_sos:
-            return mlm_X, mlm_X_char, mlm_X_char_len, mlm_positions, mlm_words, mlm_weights
+            return mlm_X, mlm_positions, mlm_words, mlm_weights
         else:
             gen_sos = gen_sos[mask]
-            return mlm_X, mlm_X_char, mlm_X_char_len, mlm_positions, mlm_words, mlm_weights, gen_sos
+            return mlm_X, mlm_positions, mlm_words, mlm_weights, gen_sos
                 
-    def shuffle_pretrain(self,pre_train1_X,pre_train1_X_char, pre_train1_X_char_len,pre_train1_seq_length, pre_train1_Y,
-            mlm_X,mlm_X_char, mlm_X_char_len, mlm_seq_length,
+    def shuffle_pretrain(self,pre_train1_X,pre_train1_seq_length, pre_train1_Y,
+            mlm_X,mlm_seq_length,
             mlm_positions, mlm_words, mlm_weights,
-            gen_X,gen_X_char, gen_X_char_len, gen_seq_length,
+            gen_X,gen_seq_length,
             gen_positions, gen_words, gen_weights,gen_sos):
         mask = np.random.permutation(len(pre_train1_X))
-        print("clf_X",pre_train1_X_char.shape)
+        #print("clf_X",pre_train1_X_char.shape)
         pre_train1_X = pre_train1_X[mask]
-        pre_train1_X_char = pre_train1_X_char[mask]
-        print("clf_X_char_len",pre_train1_X_char_len.shape)
-        pre_train1_X_char_len = pre_train1_X_char_len[mask]
+        #pre_train1_X_char = pre_train1_X_char[mask]
+        #print("clf_X_char_len",pre_train1_X_char_len.shape)
+        #pre_train1_X_char_len = pre_train1_X_char_len[mask]
         pre_train1_seq_length = np.array(pre_train1_seq_length) 
         pre_train1_seq_length = pre_train1_seq_length[mask]
-        print("clf_X_char_len_shape",pre_train1_X_char_len.shape)
+        #print("clf_X_char_len_shape",pre_train1_X_char_len.shape)
         pre_train1_Y = pre_train1_Y[mask]
         print("mask",len(mask),mask)
        
         mlm_X = mlm_X[mask]
-        mlm_X_char = mlm_X_char[mask]
-        print("mlm_X_char_len",mlm_X_char_len.shape,mlm_X_char_len)
-        mlm_X_char_len = mlm_X_char_len[mask]
+        #mlm_X_char = mlm_X_char[mask]
+        #print("mlm_X_char_len",mlm_X_char_len.shape,mlm_X_char_len)
+        #mlm_X_char_len = mlm_X_char_len[mask]
         mlm_seq_length= np.array(mlm_seq_length)
         mlm_seq_length = mlm_seq_length[mask]
         mlm_positions = np.array(mlm_positions)
         mlm_words = np.array(mlm_words)
         mlm_weights = np.array(mlm_weights)
-        print("mlm_X_char_len_",len(mlm_X_char_len),mlm_X_char_len,"\nmlm_positions",mlm_positions)
+        #print("mlm_X_char_len_",len(mlm_X_char_len),mlm_X_char_len,"\nmlm_positions",mlm_positions)
         print("mlm_X_char_len_",mlm_positions.shape,mlm_words.shape,mlm_weights.shape,"\nmlm_positions",mlm_positions)
         mlm_positions = mlm_positions[mask]
         mlm_words = mlm_words[mask]
         mlm_weights = mlm_weights[mask]
 
         gen_X = gen_X[mask]
-        gen_X_char = gen_X_char[mask]
-        print("mlm_X_char_len",gen_X_char_len.shape,gen_X_char_len)
-        gen_X_char_len = gen_X_char_len[mask]
+        #gen_X_char = gen_X_char[mask]
+        #print("mlm_X_char_len",gen_X_char_len.shape,gen_X_char_len)
+        #gen_X_char_len = gen_X_char_len[mask]
         gen_seq_length = np.array(gen_seq_length)
         gen_seq_length = gen_seq_length[mask]
         gen_positions = np.array(gen_positions)
         gen_words = np.array(gen_words)
         gen_weights = np.array(gen_weights)
-        print("gen_X_char_len_",len(gen_X_char_len),gen_X_char_len,"\ngen_positions",gen_positions)
+        #print("gen_X_char_len_",len(gen_X_char_len),gen_X_char_len,"\ngen_positions",gen_positions)
         print("gen_X_char_len_",gen_positions.shape,gen_words.shape,gen_weights.shape,"\ngen_positions",gen_positions)
         gen_positions = gen_positions[mask]
         gen_words = gen_words[mask]
         gen_sos = np.array(gen_sos)
         gen_sos = gen_sos[mask] 
-        return ( pre_train1_X, pre_train1_X_char, pre_train1_X_char_len,pre_train1_seq_length, pre_train1_Y,mlm_X, mlm_X_char, mlm_X_char_len, mlm_seq_length,mlm_positions,mlm_words,mlm_weights,
-                gen_X, gen_X_char, gen_X_char_len,gen_seq_length, gen_positions,gen_words,gen_weights ,gen_sos )
+        return ( pre_train1_X, pre_train1_seq_length, pre_train1_Y,mlm_X, mlm_seq_length,mlm_positions,mlm_words,mlm_weights,
+                gen_X, gen_seq_length, gen_positions,gen_words,gen_weights ,gen_sos )
 
             
 
@@ -835,9 +843,9 @@ class Model:
 
 
 step = 0
-def get_pretrain_batch(train_X, train_X_char, train_X_char_len, train_Y, seq_length, batch_size,
-        mlm_X, mlm_X_char,mlm_X_char_len,mlm_mask_positions,mlm_mask_words,mlm_mask_weights,mlm_seq_length, 
-        gen_X, gen_X_char, gen_X_char_len,gen_pad_positions,gen_pad_words,gen_pad_weights,gen_seq_length,gen_sos,
+def get_pretrain_batch(train_X,  train_Y, seq_length, batch_size,
+        mlm_X, mlm_mask_positions,mlm_mask_words,mlm_mask_weights,mlm_seq_length, 
+        gen_X, gen_pad_positions,gen_pad_words,gen_pad_weights,gen_seq_length,gen_sos,
         mode = None):
     global step
     #print("\nthe length of train_data",len(train_X))
@@ -847,20 +855,20 @@ def get_pretrain_batch(train_X, train_X_char, train_X_char_len, train_Y, seq_len
     print("step",step*batch_size,(step+1)*batch_size)
     #print("batch_size",batch_size,step*batch_size,(step+1)*batch_size)
     train_batch_X = train_X[step*batch_size : (step+1)*batch_size]
-    train_batch_X_char = train_X_char[step*batch_size : (step+1)*batch_size]
-    train_batch_X_char_len = train_X_char_len[step*batch_size : (step+1)*batch_size]
+    #train_batch_X_char = train_X_char[step*batch_size : (step+1)*batch_size]
+    #train_batch_X_char_len = train_X_char_len[step*batch_size : (step+1)*batch_size]
     train_batch_Y = train_Y[step*batch_size : (step+1)*batch_size]
     mlm_batch_X = mlm_X[step*batch_size : (step+1)*batch_size]
-    mlm_batch_X_char = mlm_X_char[step*batch_size : (step+1)*batch_size]
-    mlm_batch_X_char_len = mlm_X_char_len[step*batch_size : (step+1)*batch_size]
+    #mlm_batch_X_char = mlm_X_char[step*batch_size : (step+1)*batch_size]
+    #mlm_batch_X_char_len = mlm_X_char_len[step*batch_size : (step+1)*batch_size]
 
     mlm_batch_mask_positions = mlm_mask_positions[step*batch_size : (step+1)*batch_size]
     mlm_batch_mask_words = mlm_mask_words[step*batch_size : (step+1)*batch_size]
     mlm_batch_mask_weights = mlm_mask_weights[step*batch_size : (step+1)*batch_size]
 
     gen_batch_X = gen_X[step*batch_size : (step+1)*batch_size]
-    gen_batch_X_char = gen_X_char[step*batch_size : (step+1)*batch_size]
-    gen_batch_X_char_len = gen_X_char_len[step*batch_size : (step+1)*batch_size]
+    #gen_batch_X_char = gen_X_char[step*batch_size : (step+1)*batch_size]
+    #gen_batch_X_char_len = gen_X_char_len[step*batch_size : (step+1)*batch_size]
 
     gen_batch_pad_positions = gen_pad_positions[step*batch_size : (step+1)*batch_size]
     gen_batch_pad_words = gen_pad_words[step*batch_size : (step+1)*batch_size]
@@ -873,10 +881,10 @@ def get_pretrain_batch(train_X, train_X_char, train_X_char_len, train_Y, seq_len
     gen_batch_sos = gen_sos[step*batch_size:(step+1)*batch_size]
 
     step += 1
-    return (train_batch_X, train_batch_X_char, train_batch_X_char_len, train_batch_Y, train_batch_X_seq_len ,
-            mlm_batch_X,mlm_batch_X_char,mlm_batch_X_char_len,mlm_batch_X_seq_len,mlm_batch_mask_positions,mlm_batch_mask_words,mlm_batch_mask_weights, 
-            gen_batch_X,gen_batch_X_char,gen_batch_X_char_len,gen_batch_X_seq_len,gen_batch_pad_positions,gen_batch_pad_words,gen_batch_pad_weights,gen_batch_sos)
-def get_batch(train_X, train_X_char, train_X_char_len, train_Y, seq_length, batch_size, mode = None):
+    return (train_batch_X, train_batch_Y, train_batch_X_seq_len ,
+            mlm_batch_X,mlm_batch_X_seq_len,mlm_batch_mask_positions,mlm_batch_mask_words,mlm_batch_mask_weights, 
+            gen_batch_X,gen_batch_X_seq_len,gen_batch_pad_positions,gen_batch_pad_words,gen_batch_pad_weights,gen_batch_sos)
+def get_batch(train_X,train_Y, seq_length, batch_size, mode = None):
     #print("\nthe length of train_data",len(train_X))
     global step
     if(mode =="init"):
@@ -884,12 +892,12 @@ def get_batch(train_X, train_X_char, train_X_char_len, train_Y, seq_length, batc
     #print("step",step)
     #print("batch_size",batch_size,step*batch_size,(step+1)*batch_size)
     train_batch_X = train_X[step*batch_size : (step+1)*batch_size]
-    train_batch_X_char = train_X_char[step*batch_size : (step+1)*batch_size]
-    train_batch_X_char_len = train_X_char_len[step*batch_size : (step+1)*batch_size]
+    #train_batch_X_char = train_X_char[step*batch_size : (step+1)*batch_size]
+    #train_batch_X_char_len = train_X_char_len[step*batch_size : (step+1)*batch_size]
     train_batch_Y = train_Y[step*batch_size : (step+1)*batch_size]
     train_batch_X_seq_len = seq_length[step*batch_size : (step+1)*batch_size]
     step += 1
-    return train_batch_X, train_batch_X_char, train_batch_X_char_len, train_batch_Y, train_batch_X_seq_len
+    return train_batch_X, train_batch_Y, train_batch_X_seq_len
 def gather_indexes(sequence_tensor, positions):
   """Gathers the vectors at the specific positions over a minibatch."""
   sequence_shape = modeling.get_shape_list(sequence_tensor, expected_rank=3)
